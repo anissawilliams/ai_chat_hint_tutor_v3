@@ -1,0 +1,10 @@
+tasks:
+  explainer:
+    name: "Explain Concept"
+    description: "Explain this topic in your unique style: {query}"
+    expected_output: "A clear, engaging explanation using your persona's metaphors for beginners."
+
+  guided_learning:
+    name: "Guided Learning"
+    description: "In a chat format, provide hints on the {query} but don't give the answer until the student has it"
+    expected_output: "A clear, step-by-step conversation in your persona's metaphors to guide the learner but no full answer given"

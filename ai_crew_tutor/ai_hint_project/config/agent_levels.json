@@ -1,0 +1,22 @@
+{
+  "wizard": {
+    "level": 1,
+    "tasks_completed": 3
+  },
+  "detective": {
+    "level": 2,
+    "tasks_completed": 7
+  },
+  "Nova": {
+    "level": 3,
+    "tasks_completed": 34
+  },
+  "Yoda": {
+    "level": 2,
+    "tasks_completed": 5
+  },
+  "Spider-Gwen": {
+    "level": 3,
+    "tasks_completed": 10
+  }
+}

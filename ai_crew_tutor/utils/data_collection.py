@@ -44,23 +44,32 @@ def inject_google_analytics():
         ga_id = st.secrets.get("google_analytics", {}).get("measurement_id", None)
 
         if not ga_id:
-            st.warning("Google Analytics measurement ID not found in secrets")
+            st.warning("⚠️ Google Analytics measurement ID not found in secrets")
             return
 
+        # Show debug info (remove after testing)
+        st.sidebar.caption(f"🔍 GA ID: {ga_id}")
+
         ga_code = f"""
-       <!-- Google tag (gtag.js) -->
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-3R2M7LSR2S"></script>
+        <!-- Google tag (gtag.js) -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id={ga_id}"></script>
         <script>
           window.dataLayer = window.dataLayer || [];
           function gtag(){{dataLayer.push(arguments);}}
           gtag('js', new Date());
           gtag('config', '{ga_id}');
+
+          // Debug logging
+          console.log('Google Analytics initialized with ID: {ga_id}');
         </script>
         """
         components.html(ga_code, height=0)
-    except Exception as e:
-        st.warning(f"Could not inject Google Analytics: {e}")
 
+        # Confirm it loaded
+        st.sidebar.success("✅ GA script injected")
+
+    except Exception as e:
+        st.sidebar.error(f"❌ GA Error: {e}")
 
 def track_ga_event(event_name, event_params=None):
     """

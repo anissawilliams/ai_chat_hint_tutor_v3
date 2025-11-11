@@ -20,12 +20,17 @@ sys.path.insert(0, base_dir)
 # ==========================
 from utils.storage import load_user_progress, save_user_progress, load_ratings, save_rating
 from utils.data_collection import TutorAnalytics, inject_google_analytics
+
 # Inject Google Analytics (call once at app start)
 inject_google_analytics()
+
 # Initialize analytics
 analytics = TutorAnalytics()
-# In your main app after inject_google_analytics()
-st.sidebar.button("🧪 Test GA Event", on_click=lambda: track_ga_event('test_event', {'test': 'true'}))
+
+# Test button - using the analytics instance
+if st.sidebar.button("🧪 Test GA Event"):
+    analytics.track_click("Test Button", "test")
+    st.sidebar.success("Test event sent!")
 from utils.gamification import (
     get_xp_for_level, get_level_tier, get_affinity_tier,
     calculate_xp_progress, add_xp, update_streak, add_affinity

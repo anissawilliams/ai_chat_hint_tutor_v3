@@ -2,7 +2,7 @@
 Code snippets library component
 """
 import streamlit as st
-from utils.snippets import CODE_SNIPPETS, get_persona_snippets
+#from utils.snippets import CODE_SNIPPETS, get_persona_snippets
 from utils.gamification import get_affinity_tier
 from utils.personas import get_available_personas
 

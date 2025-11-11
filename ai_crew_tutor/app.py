@@ -24,7 +24,8 @@ from utils.data_collection import TutorAnalytics, inject_google_analytics
 inject_google_analytics()
 # Initialize analytics
 analytics = TutorAnalytics()
-
+# In your main app after inject_google_analytics()
+st.sidebar.button("🧪 Test GA Event", on_click=lambda: track_ga_event('test_event', {'test': 'true'}))
 from utils.gamification import (
     get_xp_for_level, get_level_tier, get_affinity_tier,
     calculate_xp_progress, add_xp, update_streak, add_affinity

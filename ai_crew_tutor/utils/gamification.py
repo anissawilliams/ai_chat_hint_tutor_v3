@@ -2,7 +2,7 @@
 Gamification logic: XP, levels, streaks, affinity
 """
 from datetime import datetime, timedelta
-from .storage import save_user_progress
+from utils.storage import save_user_progress
 
 def get_xp_for_level(level):
     """Calculate XP needed for a given level"""

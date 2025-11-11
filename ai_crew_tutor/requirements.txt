@@ -20,3 +20,6 @@ cohere
 requests
 huggingface
 plotly
+streamlit-analytics
+streamlit-modal
+firebase-admin

@@ -9,14 +9,18 @@
   },
   "Nova": {
     "level": 3,
-    "tasks_completed": 34
+    "tasks_completed": 38
   },
   "Yoda": {
     "level": 2,
-    "tasks_completed": 5
+    "tasks_completed": 6
   },
   "Spider-Gwen": {
     "level": 3,
-    "tasks_completed": 10
+    "tasks_completed": 18
+  },
+  "Elsa": {
+    "level": 2,
+    "tasks_completed": 8
   }
 }

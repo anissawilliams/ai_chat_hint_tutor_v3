@@ -2,10 +2,13 @@
 Persona selection grid component
 """
 import streamlit as st
+
 from utils.personas import PERSONA_UNLOCK_LEVELS
+from utils.data_collection import TutorAnalytics
 
 def render_persona_selector(user_level, user_affinity, persona_avatars):
     """Render persona selection grid"""
+    analytics = TutorAnalytics()
     st.subheader("🎯 Choose Your Tutor")
     
     cols_per_row = 3
@@ -30,8 +33,10 @@ def render_persona_selector(user_level, user_affinity, persona_avatars):
                             type="primary" if st.session_state.current_persona == persona_name else "secondary"
                         ):
                             st.session_state.current_persona = persona_name
+                            analytics.track_click("Select Persona")
+                            analytics.track_persona_selection(persona_name)
                             st.rerun()
-                        
+
                         # Show affinity
                         if affinity > 0:
                             st.markdown(f"""

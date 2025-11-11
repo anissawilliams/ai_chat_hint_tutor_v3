@@ -1,10 +1,12 @@
 {
-  "level": 3,
-  "xp": 245,
-  "streak": 3,
-  "last_visit": "2025-11-08",
+  "level": 4,
+  "xp": 350,
+  "streak": 1,
+  "last_visit": "2025-11-11",
   "affinity": {
-    "Nova": 125,
-    "Spider-Gwen": 27
+    "Nova": 137,
+    "Spider-Gwen": 51,
+    "Elsa": 24,
+    "Yoda": 3
   }
 }

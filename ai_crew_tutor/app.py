@@ -1,6 +1,7 @@
 """
 AI Java Tutor Pro - Main Application
 Gamified learning experience with persona-based tutoring
+Added full Google Analytics integration with Firebase
 """
 import streamlit as st
 import sys
@@ -13,16 +14,23 @@ from datetime import datetime
 base_dir = os.path.dirname(__file__)
 sys.path.insert(0, base_dir)
 
+
 # ==========================
 # IMPORT UTILITIES
 # ==========================
 from utils.storage import load_user_progress, save_user_progress, load_ratings, save_rating
+from utils.data_collection import TutorAnalytics, inject_google_analytics
+# Inject Google Analytics (call once at app start)
+inject_google_analytics()
+# Initialize analytics
+analytics = TutorAnalytics()
+
 from utils.gamification import (
     get_xp_for_level, get_level_tier, get_affinity_tier,
     calculate_xp_progress, add_xp, update_streak, add_affinity
 )
 from utils.personas import build_persona_data, get_available_personas, PERSONA_UNLOCK_LEVELS
-from utils.snippets import CODE_SNIPPETS, get_persona_snippets
+from utils.data_collection import TutorAnalytics, inject_google_analytics
 
 # ==========================
 # IMPORT COMPONENTS
@@ -40,7 +48,6 @@ from components.analytics import render_analytics
 # PAGE CONFIG
 # ==========================
 st.set_page_config(page_title="AI Java Tutor Pro V2_a", page_icon="🧠", layout="wide")
-
 # ==========================
 # SESSION STATE INIT
 # ==========================
@@ -64,8 +71,10 @@ def init_session_state():
     if 'snippet_to_paste' not in st.session_state:
         st.session_state.snippet_to_paste = None
 
+
 init_session_state()
 update_streak(st.session_state.user_progress, st.session_state)
+
 
 # ==========================
 # LOAD DATA
@@ -118,278 +127,16 @@ except Exception as e:
         return f"[Demo Mode] {persona} would explain: {question[:50]}..."
 
 # ==========================
-# CSS + BACKGROUND
+# LOAD CSS
 # ==========================
-def load_css():
-    selected_persona = st.session_state.get("current_persona")
-    # Default to Nova's background
-    background = "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
-    if selected_persona and selected_persona in backgrounds:
-        background = backgrounds[selected_persona]
+from components import css
+css.load_css()
 
-    st.markdown(f"""
-    <style>
-    /* Full app background */
-    .stApp {{
-        background: {background};
-        background-attachment: fixed;
-        background-size: cover;
-        background-repeat: no-repeat;
-        min-height: 100vh;
-        color: white;
-        font-family: 'Segoe UI', sans-serif;
-    }}
-    /* Dark overlay for readability */
-    .stApp::before {{
-        content: "";
-        position: fixed;
-        top:0; left:0; right:0; bottom:0;
-        background: rgba(0,0,0,0.4);
-        pointer-events: none;
-        z-index: -1;
-    }}
-
-    /* Compact level card */
-    .level-card {{
-        background: rgba(0, 0, 0, 0.6);
-        backdrop-filter: blur(12px);
-        padding: 12px 15px;
-        border-radius: 10px;
-        border: 2px solid rgba(255, 255, 255, 0.2);
-        margin-bottom: 12px;
-        color: white;
-        text-shadow: 0 0 5px rgba(0,0,0,0.7);
-    }}
-
-    /* XP bar */
-    .xp-bar {{
-        height: 20px;
-        background: rgba(255,255,255,0.15);
-        border-radius: 10px;
-        overflow: hidden;
-        position: relative;
-        width: 100%;
-    }}
-    .xp-fill {{
-        height: 100%;
-        background: linear-gradient(90deg, #43e97b 0%, #38f9d7 100%);
-        width: 0;
-        transition: width 1s ease;
-    }}
-    .xp-text {{
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        font-weight: bold;
-        font-size: 12px;
-        color: white;
-        text-shadow: 0 0 6px rgba(0,0,0,0.7);
-    }}
-
-    /* Streak badge pulse */
-    .streak-badge {{
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        padding: 6px 12px;
-        border-radius: 12px;
-        font-size: 16px;
-        font-weight: bold;
-        color: white;
-        text-shadow: 0 0 3px rgba(0,0,0,0.7);
-        animation: pulse 1.2s infinite;
-    }}
-    @keyframes pulse {{
-        0% {{ transform: scale(1); }}
-        50% {{ transform: scale(1.08); }}
-        100% {{ transform: scale(1); }}
-    }}
-
-    /* Compact persona cards in grid */
-    .persona-card {{
-        background: rgba(0,0,0,0.5);
-        color: white;
-        padding: 8px;
-        border-radius: 8px;
-        margin: 3px;
-        transition: all 0.3s;
-        border: 2px solid rgba(255,255,255,0.3);
-        backdrop-filter: blur(10px);
-        text-align: center;
-        text-shadow: 0 0 3px rgba(0,0,0,0.7);
-        cursor: pointer;
-        min-height: 70px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-    }}
-    .persona-card:hover {{ 
-        transform: translateY(-3px);
-        border-color: rgba(255,255,255,0.6);
-        box-shadow: 0 5px 20px rgba(0,0,0,0.3);
-    }}
-    .locked-persona {{ 
-        opacity: 0.35; 
-        filter: grayscale(100%);
-        cursor: not-allowed;
-    }}
-    .locked-persona:hover {{
-        transform: none;
-    }}
-    .persona-avatar {{
-        font-size: 28px;
-        margin-bottom: 3px;
-    }}
-    .persona-name {{
-        font-size: 12px;
-        font-weight: bold;
-        margin: 2px 0;
-        line-height: 1.2;
-    }}
-    .persona-level {{
-        font-size: 10px;
-        opacity: 0.7;
-    }}
-    
-    /* App title */
-    .app-title {{
-        text-align: center;
-        padding: 20px 0 10px 0;
-        margin: 0;
-    }}
-    .app-title h1 {{
-        font-size: 48px;
-        font-weight: bold;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        margin: 0;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        letter-spacing: 1px;
-    }}
-    .app-title p {{
-        font-size: 18px;
-        color: rgba(255,255,255,0.9);
-        margin: 5px 0 0 0;
-        text-shadow: 0 0 10px rgba(0,0,0,0.7);
-    }}
-
-    /* Affinity bars */
-    .affinity-bar {{ 
-        height: 6px; 
-        background: rgba(255,255,255,0.3); 
-        border-radius: 3px; 
-        overflow: hidden; 
-        margin-top: 5px;
-        width: 100%;
-    }}
-    .affinity-fill {{ 
-        height: 100%; 
-        background: linear-gradient(90deg, #ffd93d 0%, #f5576c 100%); 
-        transition: width 0.8s ease; 
-    }}
-
-    /* Reward popup */
-    .reward-popup {{
-        position: fixed; top: 50%; left: 50%;
-        transform: translate(-50%, -50%);
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 40px; border-radius: 20px;
-        box-shadow: 0 10px 50px rgba(0,0,0,0.5);
-        z-index: 1000; text-align: center;
-        animation: bounceIn 0.5s;
-        color: white; text-shadow: 0 0 5px rgba(0,0,0,0.7);
-    }}
-    @keyframes bounceIn {{
-        0% {{ transform: translate(-50%, -50%) scale(0.3); }}
-        50% {{ transform: translate(-50%, -50%) scale(1.05); }}
-        100% {{ transform: translate(-50%, -50%) scale(1); }}
-    }}
-
-    /* Persona selector container */
-    .persona-selector {{
-        background: rgba(0, 0, 0, 0.5);
-        backdrop-filter: blur(12px);
-        padding: 15px;
-        border-radius: 12px;
-        border: 2px solid rgba(255, 255, 255, 0.2);
-        margin-bottom: 15px;
-    }}
-
-    /* Compact header text */
-    .level-card h1 {{
-        font-size: 22px;
-        margin: 0 0 8px 0;
-    }}
-    .level-card h3 {{
-        font-size: 16px;
-        margin: 5px 0;
-    }}
-    
-    /* Button text visibility fix */
-    .stButton > button {{
-        color: white !important;
-        font-weight: 600 !important;
-        text-shadow: 0 1px 3px rgba(0,0,0,0.5) !important;
-        border: 2px solid rgba(255,255,255,0.3) !important;
-        background: rgba(0,0,0,0.4) !important;
-        backdrop-filter: blur(10px) !important;
-    }}
-    .stButton > button:hover {{
-        border-color: rgba(255,255,255,0.6) !important;
-        background: rgba(255,255,255,0.1) !important;
-        transform: translateY(-2px);
-    }}
-    /* Radio option container */
-    div[data-baseweb="radio"] {{
-        background: rgba(0, 0, 0, 0.4);
-        border-radius: 10px;
-        padding: 10px;
-        margin-bottom: 10px;
-        border: 2px solid rgba(255, 255, 255, 0.2);
-    }}
-
-/* Radio label text */
-    div[data-baseweb="radio"] label {{
-        color: white !important;
-        font-weight: 600 !important;
-        text-shadow: 0 1px 3px rgba(0,0,0,0.7) !important;
-    }}
-
-
-    /* Radio button text visibility */
-    .stRadio label {{
-        color: white !important;
-        font-weight: 500 !important;
-        text-shadow: 0 1px 3px rgba(0,0,0,0.7) !important;
-        background: rgba(0,0,0,0.4); /* adds contrast */
-        padding: 6px 12px;
-        border-radius: 8px;
-        margin-bottom: 4px;
-    }}
-    
-    /* Selectbox text visibility */
-    .stSelectbox label {{
-        color: white !important;
-        font-weight: 600 !important;
-        text-shadow: 0 1px 3px rgba(0,0,0,0.7) !important;
-    }}
-    
-    /* Text input labels */
-    .stTextArea label, .stTextInput label {{
-        color: white !important;
-        font-weight: 600 !important;
-        text-shadow: 0 1px 3px rgba(0,0,0,0.7) !important;
-    }}
-    </style>
-
-    """, unsafe_allow_html=True)
-load_css()
-
+# ==========================
+# ADD ANALYTICS
+# ==========================
+st.metric("Session Time", f"{analytics.get_session_duration():.1f} min",
+                 delta=None, delta_color="off")
 # ==========================
 # REWARD POPUP
 # ==========================
@@ -438,6 +185,47 @@ if st.session_state.current_persona:
     elif st.session_state.active_page == 'snippets':
         render_snippets_library(user_level, user_affinity, persona_avatars,
                                 get_available_personas, get_affinity_tier)
+
+
+# # Tracking page navigation (if you use multipage)
+# def track_page_view(page_name):
+#     """Track when users navigate to different pages"""
+#     analytics = TutorAnalytics()
+#     analytics.track_click(f"View: {page_name}", "page_view")
+#
+#
+# # Example: How to track specific events in your app
+# def example_tracking_patterns():
+#     """Examples of tracking different user actions"""
+#
+#     analytics = TutorAnalytics()
+#
+#     # Track feature usage
+#     if st.button("Try Code Example"):
+#         analytics.track_click("Code Example", "feature")
+#         # Your code...
+#
+#     # Track difficulty level selection
+#     difficulty = st.select_slider("Difficulty", ["Beginner", "Intermediate", "Advanced"])
+#     if difficulty:
+#         analytics.track_click(f"Difficulty: {difficulty}", "setting")
+#
+#     # Track when users copy code
+#     code = "public static void main(String[] args) {}"
+#     if st.button("📋 Copy Code"):
+#         analytics.track_click("Copy Code", "action")
+#         st.code(code, language="java")
+#
+#     # Track help/hint requests
+#     if st.button("💡 Get Hint"):
+#         analytics.track_click("Request Hint", "help")
+#         # Your hint logic...
+#
+#     # Track completion of exercises
+#     if st.button("✅ Submit Answer"):
+#         analytics.track_click("Submit Exercise", "exercise")
+#         # Check answer logic...
+#
 
 # ==========================
 # FOOTER

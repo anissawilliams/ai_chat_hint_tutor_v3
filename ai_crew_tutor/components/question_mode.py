@@ -5,11 +5,12 @@ Supports both quick explanations and interactive chat guidance
 import streamlit as st
 from utils.gamification import add_xp, add_affinity
 from utils.storage import save_user_progress, save_rating
+from utils.data_collection import TutorAnalytics
 
 
 def render_question_mode(selected_persona, persona_avatars, create_crew, user_level):
     """Render the question/chat mode interface"""
-
+    analytics = TutorAnalytics()
     # Mode toggle
     col1, col2 = st.columns(2)
     with col1:
@@ -36,6 +37,9 @@ def render_question_mode(selected_persona, persona_avatars, create_crew, user_le
 def render_chat_interface(selected_persona, persona_avatars, create_crew, user_level):
     """Render interactive chat-based guided learning"""
 
+    # Initialize analytics
+    analytics = TutorAnalytics()
+
     st.markdown(f"### 💬 Chat with {persona_avatars.get(selected_persona, '🤖')} {selected_persona}")
     st.caption("Describe what you're trying to build, and I'll guide you through it step-by-step!")
 
@@ -44,11 +48,13 @@ def render_chat_interface(selected_persona, persona_avatars, create_crew, user_l
         st.session_state.chat_history = []
     if 'current_chat_persona' not in st.session_state:
         st.session_state.current_chat_persona = selected_persona
+        analytics.track_persona_selection(selected_persona)
 
     # Reset chat if persona changed
     if st.session_state.current_chat_persona != selected_persona:
         st.session_state.chat_history = []
         st.session_state.current_chat_persona = selected_persona
+        analytics.track_persona_selection(selected_persona)
 
     # Display chat history
     for message in st.session_state.chat_history:
@@ -56,7 +62,7 @@ def render_chat_interface(selected_persona, persona_avatars, create_crew, user_l
                              avatar=message.get("avatar", "🧑‍💻" if message["role"] == "user" else "🤖")):
             st.markdown(message["content"])
 
-    # Chat input - CHANGED FROM st.text_input to st.chat_input
+    # Chat input
     user_input = st.chat_input("Describe what you want to build...")
 
     if user_input:
@@ -67,20 +73,15 @@ def render_chat_interface(selected_persona, persona_avatars, create_crew, user_l
             "avatar": "🧑‍💻"
         })
 
-        # Display user message (st.chat_input doesn't display automatically)
+        # Display user message
         with st.chat_message("user", avatar="🧑‍💻"):
             st.markdown(user_input)
 
         # Generate AI response with context
         with st.chat_message("assistant", avatar=persona_avatars.get(selected_persona, "🤖")):
             with st.spinner(f"{selected_persona} is thinking..."):
-                # Build conversation context
                 context = build_chat_context(st.session_state.chat_history, selected_persona)
-
-                # Get AI response
                 response = create_crew(selected_persona, context)
-
-                # Display response
                 st.markdown(response)
 
                 # Add to history
@@ -90,7 +91,14 @@ def render_chat_interface(selected_persona, persona_avatars, create_crew, user_l
                     "avatar": persona_avatars.get(selected_persona, "🤖")
                 })
 
-        # Award XP for engagement (smaller amount than completing a full explanation)
+                # Track the interaction
+                analytics.track_question(
+                    question=user_input,
+                    response=response,
+                    persona=selected_persona
+                )
+
+        # Award XP for engagement
         xp_gained = 5
         level_up = add_xp(st.session_state.user_progress, xp_gained, st.session_state)
         add_affinity(st.session_state.user_progress, selected_persona, 3, st.session_state)
@@ -107,6 +115,7 @@ def render_chat_interface(selected_persona, persona_avatars, create_crew, user_l
     # Clear chat button
     if st.session_state.chat_history:
         if st.button("🗑️ Clear Chat", type="secondary"):
+            analytics.track_click("Clear Chat", "button")
             st.session_state.chat_history = []
             st.rerun()
 

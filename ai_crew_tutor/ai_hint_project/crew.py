@@ -26,8 +26,8 @@ import json
 HF_ACCESS_TOKEN = st.secrets["HUGGINGFACE_ACCESS_TOKEN"]
 
 # Hugging Face model endpoint (for GPT-2, you can change it to other models as needed)
-HF_API_URL = "https://api-inference.huggingface.co/models/gpt2"  # You can use other models like gpt-j or distilGPT
-
+#HF_API_URL = "https://api-inference.huggingface.co/models/gpt2"  # You can use other models like gpt-j or distilGPT
+HF_API_URL="https://router.huggingface.co/hf-inference/models/gpt2"
 def get_llm():
     # Prepare the headers with Authorization
     headers = {

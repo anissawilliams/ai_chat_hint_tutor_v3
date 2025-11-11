@@ -36,34 +36,36 @@ def initialize_firebase():
 
 
 def inject_google_analytics():
-    """Alternative method using st.markdown"""
+    """Inject Google Analytics with debug mode enabled"""
     try:
         ga_id = st.secrets.get("google_analytics", {}).get("measurement_id", None)
 
         if not ga_id:
+            st.warning("⚠️ Google Analytics measurement ID not found")
             return
 
-        # Use markdown with unsafe_allow_html instead
-        st.markdown(f"""
+        ga_code = f"""
+        <!-- Google tag (gtag.js) with debug -->
         <script async src="https://www.googletagmanager.com/gtag/js?id={ga_id}"></script>
         <script>
           window.dataLayer = window.dataLayer || [];
           function gtag(){{dataLayer.push(arguments);}}
           gtag('js', new Date());
-          gtag('config', '{ga_id}');
+          gtag('config', '{ga_id}', {{
+            'debug_mode': true,
+            'send_page_view': true
+          }});
+          console.log('📊 Google Analytics initialized:', '{ga_id}');
         </script>
-        """, unsafe_allow_html=True)
+        """
+        components.html(ga_code, height=0)
 
     except Exception as e:
-        pass
-
+        st.error(f"GA initialization error: {e}")
+    pass
 def track_ga_event(event_name, event_params=None):
     """
     Send custom events to Google Analytics
-
-    Args:
-        event_name (str): Name of the event to track
-        event_params (dict): Dictionary of event parameters
     """
     if event_params is None:
         event_params = {}
@@ -73,16 +75,21 @@ def track_ga_event(event_name, event_params=None):
 
         ga_event = f"""
         <script>
-          if (typeof gtag !== 'undefined') {{
-            gtag('event', '{event_name}', {{{params_str}}});
-          }}
+          (function() {{
+            console.log('🔵 Attempting to send GA event: {event_name}');
+            if (typeof gtag !== 'undefined') {{
+              gtag('event', '{event_name}', {{{params_str}}});
+              console.log('✅ GA event sent: {event_name}');
+            }} else {{
+              console.error('❌ gtag not defined for event: {event_name}');
+            }}
+          }})();
         </script>
         """
         components.html(ga_event, height=0)
     except Exception as e:
-        # Silently fail for GA tracking to not disrupt user experience
-        pass
-
+        st.sidebar.error(f"GA Error: {e}")
+    pass
 
 class TutorAnalytics:
     """

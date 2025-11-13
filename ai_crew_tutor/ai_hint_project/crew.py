@@ -114,6 +114,16 @@ def load_yaml(path):
     with open(path, 'r') as f:
         return yaml.safe_load(f)
 
+def format_response(raw_text):
+    # Remove <think> tags
+    cleaned = re.sub(r"<think>.*?</think>\n?", "", raw_text, flags=re.DOTALL)
+
+    # Normalize code blocks (if model uses indentation instead of backticks)
+    if "public static" in cleaned or "def " in cleaned:
+        cleaned = re.sub(r"(?:\n\s{4,}.*)+", lambda m: f"\n```java\n{m.group(0)}\n```", cleaned)
+
+    return cleaned.strip()
+
 
 # 🚀 Crew creation
 def create_crew(persona: str, user_question: str):
@@ -141,7 +151,10 @@ def create_crew(persona: str, user_question: str):
     )
 
     reaction = persona_reactions.get(persona, "No reaction available.")
-    task_description = f"{reaction}\n\n{user_question}" if is_code_input(user_question) else user_question
+    task_description = f"{reaction}\n\n{user_question}"
+    if is_code_input(user_question):
+        task_description += "\n\nIf helpful, include code examples using triple backticks."
+
 
     # Get RAG context for the question
     rag_context = rag_tool(user_question)
@@ -167,5 +180,6 @@ def create_crew(persona: str, user_question: str):
     crew = Crew(agents=[agent], tasks=[task], verbose=True)
     result = crew.kickoff()
     levels.update_level(persona)
-    cleaned_content = re.sub(r"<think>.*?</think>\n?", "", result.tasks_output[0].raw, flags=re.DOTALL)
+    cleaned_content = format_response(result.tasks_output[0].raw)
+
     return cleaned_content

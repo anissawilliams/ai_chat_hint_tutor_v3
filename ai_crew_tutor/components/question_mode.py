@@ -35,8 +35,8 @@ def _ensure_step_state():
 
 def build_efficient_chat_context(chat_history, persona, step_info, validation_result=None):
     """
-    Build context that includes FULL conversation history so the LLM can see what it already said.
-    This prevents repetition and allows progressive scaffolding.
+    Build context that includes FULL conversation history and clear scaffolding rules.
+    Prevents giving away answers too early while keeping interactions efficient.
     """
     attempts = step_info['attempts']
 
@@ -53,15 +53,31 @@ def build_efficient_chat_context(chat_history, persona, step_info, validation_re
         if not is_correct:
             feedback_section = f"\n**Validation Result**: {msg}"
 
-    # Determine what guidance level to suggest based on attempts
+    # Progressive scaffolding strategy based on attempts
     if attempts == 0:
-        guidance_hint = "Start with high-level structure and one concrete example."
+        strategy = """FIRST INTERACTION - Set Direction:
+- Acknowledge what they want to build
+- Break it into 2-3 concrete sub-steps (e.g., "1. Create method signature, 2. Use stream API, 3. Collect results")
+- Give ONE small example for context (e.g., "Like how .filter() works: list.stream().filter(x -> x > 0)")
+- Ask them to try the first step (be specific: "Start with the method signature - what should it accept and return?")"""
     elif attempts == 1:
-        guidance_hint = "They've tried once. Give more specific hints: method signatures, key APIs, or a small code snippet."
+        strategy = """SECOND INTERACTION - Targeted Hints:
+- Point out specifically what's missing or wrong in their attempt
+- Provide API hints (e.g., "You'll need .map() to transform each element")
+- Show structure without solution (e.g., "The pattern is: stream() -> transform -> collect()")
+- Ask them to try incorporating this specific hint"""
+    elif attempts == 2:
+        strategy = """THIRD INTERACTION - Partial Code:
+- Give a partial implementation with blanks (e.g., "public List<Integer> transform(List<Integer> nums) { return nums.stream().map(____ -> ____ * 2).collect(____); }")
+- Explain what each blank should be
+- Ask them to fill in the blanks and test"""
     else:
-        guidance_hint = "They're stuck. Provide a working skeleton with blanks or show the solution with explanations."
+        strategy = """FOURTH+ INTERACTION - Complete Scaffold:
+- Provide working code with detailed line-by-line explanation
+- Explain WHY each part works
+- Ask them to modify it slightly (e.g., "Now change it to triple the numbers instead of double")"""
 
-    context = f"""You are {persona}, an efficient Java tutor. You can see the full conversation history below.
+    context = f"""You are {persona}, an efficient Java tutor who guides students through problems progressively.
 
 CONVERSATION SO FAR:
 {conversation}
@@ -70,16 +86,18 @@ CURRENT SITUATION:
 - This is attempt #{attempts + 1} at the current step
 {feedback_section}
 
-YOUR TASK:
-- Review what you've already told them (avoid repeating the same advice)
-- Look at their latest attempt and give SPECIFIC feedback on what's wrong/missing
-- {guidance_hint}
-- Keep response under 200 words but actionable
-- End with ONE clear directive: "Now try: [specific action]"
+YOUR SCAFFOLDING STRATEGY FOR THIS ATTEMPT:
+{strategy}
 
-IMPORTANT: Don't repeat things you already said. Build on the conversation progressively.
+CRITICAL RULES:
+1. NEVER give the complete working solution before attempt #4
+2. Review what you already said - build on it, don't repeat
+3. Keep responses conversational and under 150 words
+4. Always end with a specific question or directive to keep conversation flowing
+5. Use code blocks for any code examples
+6. Be encouraging but don't hand-hold excessively
 
-Respond as {persona}:"""
+Respond as {persona} and keep the conversation going:"""
 
     return context
 
@@ -104,7 +122,7 @@ def render_chat_interface(selected_persona, persona_avatars, create_crew, user_l
     analytics = TutorAnalytics()
 
     st.markdown(f"### 💬 Chat with {persona_avatars.get(selected_persona, '🤖')} {selected_persona}")
-    st.caption("Describe what you're trying to build - I'll give you structured guidance!")
+    st.caption("Describe what you're trying to build - I'll guide you through it step-by-step!")
 
     # Initialize chat history
     if 'chat_history' not in st.session_state:
@@ -134,11 +152,15 @@ def render_chat_interface(selected_persona, persona_avatars, create_crew, user_l
         with st.chat_message("user", avatar="🧑‍💻"):
             st.markdown(user_input)
 
-        # Run validator
+        # Run validator if it looks like code
         validator = st.session_state.get('current_expected_pattern')
         validation_result = None
 
-        if validator and callable(validator):
+        # Only validate if input looks like code (contains common code patterns)
+        looks_like_code = any(pattern in user_input.lower() for pattern in
+                             ['public', 'private', 'return', 'void', '{', 'list', 'stream'])
+
+        if validator and callable(validator) and looks_like_code:
             res = validator(user_input)
             if isinstance(res, tuple):
                 ok, msg = res
@@ -149,15 +171,15 @@ def render_chat_interface(selected_persona, persona_avatars, create_crew, user_l
             st.session_state.tutor_step['last_validation_result'] = validation_result
 
             if ok:
+                # Success! Celebrate and move on
                 st.success("✅ Correct! Great work.")
                 st.session_state.tutor_step['attempts'] = 0
                 st.session_state.tutor_step['step_id'] += 1
-                st.session_state.chat_history = []  # Reset for next problem
                 add_xp(st.session_state.user_progress, 15, st.session_state)
                 save_user_progress(st.session_state.user_progress)
 
-                # Provide brief next step
-                response = f"Perfect! Your solution works correctly. {get_next_challenge(st.session_state.tutor_step['step_id'])}"
+                # Keep conversation going with next challenge
+                response = f"Perfect! Your solution works correctly.\n\n{get_next_challenge(st.session_state.tutor_step['step_id'])}"
 
                 with st.chat_message("assistant", avatar=persona_avatars.get(selected_persona, "🤖")):
                     st.markdown(response)
@@ -169,8 +191,11 @@ def render_chat_interface(selected_persona, persona_avatars, create_crew, user_l
 
                 st.rerun()
                 return
+            else:
+                # Incorrect attempt - increment counter
+                st.session_state.tutor_step['attempts'] += 1
 
-        # Build context with FULL conversation history
+        # Build context with FULL conversation history and scaffolding rules
         context = build_efficient_chat_context(
             st.session_state.chat_history,
             selected_persona,
@@ -189,19 +214,17 @@ def render_chat_interface(selected_persona, persona_avatars, create_crew, user_l
                 })
                 analytics.track_question(question=user_input, response=response, persona=selected_persona)
 
-        # Increment attempts for next round
-        st.session_state.tutor_step['attempts'] += 1
         st.rerun()
 
 
 def get_next_challenge(step_id):
     """Provide next learning challenge based on completed step"""
     challenges = {
-        1: "Ready for the next challenge? Try creating a method that filters even numbers from a list.",
-        2: "Nice! Now let's tackle error handling. Can you add validation for null/empty lists?",
-        3: "Excellent progress! Want to combine operations? Try filter + map in one stream pipeline."
+        1: "Ready for the next challenge? Try creating a method that **filters only even numbers** from a List<Integer> and returns them.",
+        2: "Nice! Now let's level up. Can you **chain operations**: filter even numbers AND double them in the same stream?",
+        3: "Excellent! Let's tackle error handling. Modify your method to **handle null input** gracefully (return empty list instead of crashing)."
     }
-    return challenges.get(step_id, "Want to try another Java concept?")
+    return challenges.get(step_id, "Want to try another Java concept? Just tell me what you'd like to learn!")
 
 
 def show_rating(selected_persona):

@@ -126,70 +126,63 @@ def render_chat_interface(selected_persona, persona_avatars, create_crew, user_l
 
 
 def build_chat_context(chat_history, persona):
-    """Build conversation context for the AI"""
+    """Build conversation context for the AI with hint escalation"""
+
     analytics = TutorAnalytics()
+
     # If this is the first message, provide initial instructions
     if len(chat_history) <= 1:
         context = f"""You are {persona}, a Java tutor using guided learning methodology.
 
-CORE PRINCIPLE: Guide through questions, NOT answers. Make the student think and work.
+CORE PRINCIPLE: Guide through questions, NOT immediate answers. Help the student think and work.
 
-STRICT RULES:
-- Keep responses SHORT (3-5 sentences max)
-- Break problems into tiny, manageable steps
-- ONLY give the full solution when the student has provided the correct and complete answer
-- Wait for student's answer before proceeding
-- Use "Step X —" structure when guiding
-- End EVERY response with a focused question using: "👉 [specific question]?"
-- If student is stuck, ask a simpler leading question
-- Check understanding by asking them to explain back
+ESCALATION RULES:
+- First attempt: ask a guiding question (3–5 sentences max).
+- Second attempt: provide a partial hint (e.g., method signature, pseudocode).
+- Third attempt: reveal the full solution clearly.
+- Always praise correct answers briefly, then move to the next step.
+- If wrong: gently correct and re-ask in simpler terms.
+- End each response with: "👉 [specific question]?"
 
 RESPONSE PATTERN:
-1. Acknowledge their goal briefly
-2. Identify the FIRST small step
-3. Ask a question about that step only
-4. Show their answer in code blocks
-5. Wait for their response
+1. Acknowledge their goal briefly.
+2. Identify the FIRST small step.
+3. Ask a guiding question about that step.
+4. If they struggle twice, escalate to a hint.
+5. If still stuck, provide the full solution.
 
-EXAMPLE:
-"Got it! You need to double each number in a List.
+Student’s question: {chat_history[-1]['content']}
 
-Step 1 — First, let's think about the method signature. 
+Respond as {persona} — start with a guiding question:"""
 
-👉 What should this method accept as input, and what should it return?"
-
-Student's question: {chat_history[-1]['content']}
-
-Respond as {persona} - ask ONE question to start:"""
     else:
         # For ongoing conversation
-        context = f"""You are {persona}, a Java tutor. Continue guiding this student in your unique way.
+        context = f"""You are {persona}, a Java tutor. Continue guiding this student with escalation.
 
-CRITICAL - ONLY GIVE FULL SOLUTIONS WHEN STUDENTS PROVIDE THE CORRECT ANSWER:
-- Respond in 3-5 sentences max
-- If they answered correctly: praise briefly, then ask about the NEXT step
-- If they're stuck: ask a simpler leading question
-- If they're wrong: gently correct and ask them to try again
-- Only reveal code when they've worked through the logic of the previous hint
-- User triple backticks (```) to format code blocks
-- Check understanding: ask them to explain their reasoning
-- End with: "👉 [one specific question]?"
-- Respond ONLY as {persona}
+RULES:
+- Keep responses short (3–5 sentences).
+- Escalate hints if the student struggles:
+  • First: guiding question
+  • Second: partial hint
+  • Third: full solution
+- Praise correct answers, then move forward.
+- Gently correct wrong answers and re-ask.
+- End with: "👉 [specific question]?"
 
 Conversation history:
 """
-        # Add recent conversation history (last 8 messages for better context)
-        recent_history = chat_history[-8:]
+        # Add recent conversation history (last 5 messages for focus)
+        recent_history = chat_history[-5:]
         for msg in recent_history:
             if msg["role"] == "user":
                 context += f"\nStudent: {msg['content']}\n"
             else:
                 context += f"\n{persona}: {msg['content']}\n"
 
-        context += f"\n{persona} (guide with ONE question, wait for response):"
+        context += f"\n{persona} (guide with escalation, end with one focused question):"
         st.session_state.show_rating = True
-    return context
 
+    return context
 
 def render_quick_explain(selected_persona, persona_avatars, create_crew, user_level):
     """Render the original quick explanation mode"""

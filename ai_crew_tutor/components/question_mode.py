@@ -1,6 +1,6 @@
 """
-Question Mode Component with Chat-based Guided Learning
-Supports both quick explanations and interactive chat guidance
+Question Mode Component with Efficient Guided Learning
+Provides scaffolded guidance in fewer interactions
 """
 import re
 import random
@@ -21,16 +21,10 @@ from utils.java_code_validator import (
 def _ensure_step_state():
     if 'tutor_step' not in st.session_state:
         st.session_state.tutor_step = {
-            'step_id': 0,           # incremental logical step counter
-            'attempts': 0,         # attempts at current step
-            'escalation': 0        # 0=guide,1=partial,2=full
+            'step_id': 0,
+            'attempts': 0,
+            'last_validation_result': None
         }
-    if 'hint_level' not in st.session_state:
-        st.session_state.hint_level = 0  # 0 none, 1 inline hint, 2 partial/masked
-    if 'peek_requested' not in st.session_state:
-        st.session_state.peek_requested = False
-    if 'solution_shown' not in st.session_state:
-        st.session_state.solution_shown = False
     if 'show_rating' not in st.session_state:
         st.session_state.show_rating = False
     if 'user_progress' not in st.session_state:
@@ -39,115 +33,71 @@ def _ensure_step_state():
         st.session_state.chat_mode = True
 
 
-def simple_validator(expected_pattern, student_answer):
+def build_efficient_chat_context(chat_history, persona, step_info, validation_result=None):
     """
-    Lightweight correctness check. Replace or expand with real tests.
-    - expected_pattern: regex or callable
-    - student_answer: string
-    Returns True if answer is acceptable.
+    Build context that provides guidance upfront based on attempts and validation feedback.
+    Combines: acknowledgment + diagnosis + targeted hint/guidance + next step in ONE response.
     """
-    if callable(expected_pattern):
-        try:
-            return bool(expected_pattern(student_answer))
-        except Exception:
-            return False
-    if expected_pattern is None:
-        return False
-    return bool(re.search(expected_pattern, student_answer, re.IGNORECASE))
-
-
-def mask_code(code, mask_ratio=0.6):
-    """Mask roughly mask_ratio of identifiers/literals to create a fill-in-the-blank peek."""
-    tokens = re.findall(r"[A-Za-z_]\w*|\d+|.", code)
-    identifiers = [i for i, t in enumerate(tokens) if re.match(r"[A-Za-z_]\w*", t)]
-    if not identifiers:
-        return code
-    to_mask = set(random.sample(identifiers, max(1, int(len(identifiers) * mask_ratio))))
-    out = []
-    for idx, tok in enumerate(tokens):
-        out.append("____" if idx in to_mask else tok)
-    return "".join(out)
-
-
-def hint_for_step(step_id, escalation):
-    """
-    Return progressively more explicit hints for the current step.
-    escalation: 0=question, 1=inline hint, 2=partial/masked
-    Replace with context-aware content in production.
-    """
-    if escalation == 0:
-        return "Think about what the method should accept and return. Focus on types."
-    if escalation == 1:
-        return "Hint: the method signature might use List<Integer> for input and output."
-    return ("Partial skeleton: public List<Integer> transform(List<Integer> nums) { "
-            "return nums.stream().map(n -> n * 2).collect(Collectors.toList()); }")
-
-
-# -----------------------
-# Prompt builder
-# -----------------------
-def build_chat_context(chat_history, persona, decisiveness=1, expected_pattern=None):
-    """
-    Build conversation context that reduces back-and-forth by:
-    - Including short guiding question + inline hint based on attempts
-    - Escalating to partial/full solution using session state and decisiveness
-    - Using an optional expected_pattern for automatic correctness checks
-    decisiveness: 0 (more Socratic), 1 (balanced), 2 (decisive)
-    """
-    _ensure_step_state()
-    analytics = TutorAnalytics()
-
+    attempts = step_info['attempts']
     last_user = chat_history[-1]['content'] if chat_history else ""
-    step = st.session_state.tutor_step
 
-    # If user just answered, run validator to possibly advance
-    if expected_pattern and len(chat_history) >= 1 and chat_history[-1]['role'] == 'user':
-        student_answer = chat_history[-1]['content']
-        if simple_validator(expected_pattern, student_answer):
-            # Mark correct: reset attempts and advance step
-            step['attempts'] = 0
-            step['step_id'] += 1
-            step['escalation'] = 0
-            st.session_state.tutor_step = step
-            st.session_state.show_rating = True
-            return (f"You’re correct. Nice work — quick praise.\n\n"
-                    f"Step {step['step_id'] + 1} — [next focused question]")
+    # Determine guidance level based on attempts
+    if attempts == 0:
+        # First attempt: give clear structure with minimal hints
+        guidance_level = "initial"
+    elif attempts == 1:
+        # Second attempt: add inline hints and partial structure
+        guidance_level = "hints"
+    else:
+        # Third+ attempt: provide scaffolded solution with explanations
+        guidance_level = "scaffolded"
 
-    # Determine escalation threshold from decisiveness
-    escalation_thresholds = {0: 3, 1: 2, 2: 1}
-    escalate_after = escalation_thresholds.get(decisiveness, 2)
+    # Build validation feedback if available
+    feedback_section = ""
+    if validation_result:
+        is_correct, msg = validation_result
+        if not is_correct:
+            feedback_section = f"\n\nValidation feedback: {msg}"
 
-    # Decide current escalation level
-    if step['attempts'] >= escalate_after:
-        step['escalation'] = min(2, step['escalation'] + 1)
+    context = f"""You are {persona}, an efficient Java tutor who guides without over-questioning.
 
-    # Build the prompt with combined guidance and compact hint
-    hint_inline = ""
-    if step['escalation'] == 1:
-        hint_inline = "Hint: consider method signature and return type (e.g., List<Integer>)."
-    elif step['escalation'] == 2:
-        hint_inline = "Partial solution: show method skeleton or short pseudocode."
+INTERACTION STYLE:
+- Pack guidance into ONE comprehensive response (not multiple back-and-forths)
+- Structure: [Quick acknowledgment] → [Diagnosis] → [Targeted guidance] → [What to do next]
+- Keep total response under 200 words but information-dense
 
-    context = f"""You are {persona}, a concise Java tutor using guided learning with escalation.
+CURRENT SITUATION:
+- Student attempt #{attempts + 1}
+- Student input: {last_user}{feedback_section}
+- Guidance level: {guidance_level}
+
+GUIDANCE BY LEVEL:
+{guidance_level == "initial" and '''
+- Ask clarifying question IF the goal is ambiguous
+- Otherwise, break down into 2-3 concrete sub-steps
+- Give one example of what the first step looks like
+- Avoid generic "think about..." questions
+''' or ''}
+{guidance_level == "hints" and '''
+- Identify what's missing/incorrect (be specific)
+- Provide inline hints: method signature template, key API methods, logic structure
+- Show a small concrete example (2-3 lines of relevant code)
+- State exactly what they should add/change next
+''' or ''}
+{guidance_level == "scaffolded" and '''
+- Provide a working code skeleton with blanks: `public List<Integer> ____(____) {{ ... }}`
+- Explain each part briefly (one sentence per section)
+- Ask them to fill in the blanks and run it
+- This gets them unstuck while still requiring active learning
+''' or ''}
+
 RULES:
-- Keep responses short (1-3 sentences) but decisive to reduce back-and-forth.
-- Each reply should: acknowledge goal, identify one small step, ask one focused question.
-- If this is attempt #{step['attempts']+1} on current step, include a short inline hint when escalation >=1.
-- If escalation == 2, include a concise partial code snippet or a very short full solution if student remains stuck.
-- Use "Step N —" labeling and end with a single focused question prefixed by "👉".
-- Avoid repeated micro-questions; prefer one question + inline hint.
+- No Socratic ping-pong; deliver actionable guidance upfront
+- Use code blocks for any code examples
+- End with ONE clear directive: "Now try: [specific action]"
+- Be encouraging but direct
 
-Student recent input: {last_user}
-
-{hint_inline if hint_inline else ""}
-
-Respond as {persona} and end with exactly one focused question using "👉".
-"""
-
-    # increment attempts for the next round (we assume this prompt will be consumed)
-    step['attempts'] += 1
-    st.session_state.tutor_step = step
-    st.session_state.show_rating = True
+Respond as {persona}:"""
 
     return context
 
@@ -160,38 +110,25 @@ def render_question_mode(selected_persona, persona_avatars, create_crew, user_le
     _ensure_step_state()
     analytics = TutorAnalytics()
 
-    # Mode toggle (simple by default)
-    col1, col2 = st.columns(2)
-    with col1:
-        st.session_state.chat_mode = True
-    # with col2:
-    #     if st.button("⚡ Quick Explain", ...): ...
-
     st.divider()
-
-    # Dispatch to the selected interface
-    if st.session_state.get('chat_mode', True):
-        render_chat_interface(selected_persona, persona_avatars, create_crew, user_level)
-        analytics.track_click("Chat Mode")
-    else:
-        render_quick_explain(selected_persona, persona_avatars, create_crew, user_level)
-
+    render_chat_interface(selected_persona, persona_avatars, create_crew, user_level)
+    analytics.track_click("Chat Mode")
     show_rating(selected_persona)
 
 
 def render_chat_interface(selected_persona, persona_avatars, create_crew, user_level):
-    """Render interactive chat-based guided learning"""
+    """Render efficient chat-based guided learning"""
     _ensure_step_state()
     analytics = TutorAnalytics()
 
     st.markdown(f"### 💬 Chat with {persona_avatars.get(selected_persona, '🤖')} {selected_persona}")
-    st.caption("Describe what you're trying to build, and I'll guide you through it step-by-step!")
+    st.caption("Describe what you're trying to build - I'll give you structured guidance!")
 
     # Initialize chat history
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = []
 
-    # --- Example: configure validator for this exercise ---
+    # Configure validator for current exercise
     if 'current_expected_pattern' not in st.session_state:
         st.session_state['current_expected_pattern'] = java_validator_factory(
             method_name="doubleNumbers",
@@ -208,36 +145,56 @@ def render_chat_interface(selected_persona, persona_avatars, create_crew, user_l
             st.markdown(message["content"])
 
     # Chat input
-    user_input = st.chat_input("Describe what you want to build...")
+    user_input = st.chat_input("Describe what you want to build or paste your code...")
 
     if user_input:
         st.session_state.chat_history.append({"role": "user", "content": user_input, "avatar": "🧑‍💻"})
         with st.chat_message("user", avatar="🧑‍💻"):
             st.markdown(user_input)
 
-        # --- Run validator ---
+        # Run validator
         validator = st.session_state.get('current_expected_pattern')
+        validation_result = None
+
         if validator and callable(validator):
             res = validator(user_input)
             if isinstance(res, tuple):
                 ok, msg = res
             else:
-                ok, msg = bool(res), ""
+                ok, msg = bool(res), "Good attempt, but not quite right yet."
+
+            validation_result = (ok, msg)
+            st.session_state.tutor_step['last_validation_result'] = validation_result
 
             if ok:
-                st.success("✅ Correct! Moving to the next step.")
+                st.success("✅ Correct! Great work.")
                 st.session_state.tutor_step['attempts'] = 0
                 st.session_state.tutor_step['step_id'] += 1
                 add_xp(st.session_state.user_progress, 15, st.session_state)
                 save_user_progress(st.session_state.user_progress)
-            else:
-                st.warning(f"⚠️ {msg}")
-                st.session_state.tutor_step['attempts'] += 1
 
-        # --- Build context and call model ---
-        context = build_chat_context(st.session_state.chat_history, selected_persona,
-                                     decisiveness=st.session_state.get("decisiveness", 1),
-                                     expected_pattern=validator)
+                # Provide brief next step instead of just celebrating
+                response = f"Perfect! Your solution works correctly. {get_next_challenge(st.session_state.tutor_step['step_id'])}"
+
+                with st.chat_message("assistant", avatar=persona_avatars.get(selected_persona, "🤖")):
+                    st.markdown(response)
+                    st.session_state.chat_history.append({
+                        "role": "assistant",
+                        "content": response,
+                        "avatar": persona_avatars.get(selected_persona, "🤖")
+                    })
+
+                st.rerun()
+                return
+
+        # Build context and call model with efficient prompting
+        context = build_efficient_chat_context(
+            st.session_state.chat_history,
+            selected_persona,
+            st.session_state.tutor_step,
+            validation_result
+        )
+
         with st.chat_message("assistant", avatar=persona_avatars.get(selected_persona, "🤖")):
             with st.spinner(f"{selected_persona} is thinking..."):
                 response = create_crew(selected_persona, context)
@@ -249,48 +206,26 @@ def render_chat_interface(selected_persona, persona_avatars, create_crew, user_l
                 })
                 analytics.track_question(question=user_input, response=response, persona=selected_persona)
 
+        # Increment attempts for next round
+        st.session_state.tutor_step['attempts'] += 1
         st.rerun()
 
 
-def render_quick_explain(selected_persona, persona_avatars, create_crew, user_level):
-    """Render the original quick explanation mode"""
-    analytics = TutorAnalytics()
-    st.markdown(f"### ⚡ Quick Explanation with {persona_avatars.get(selected_persona, '🤖')} {selected_persona}")
-    question = st.text_area(
-        "What Java concept would you like explained?",
-        placeholder="e.g., What are generics? How do ArrayLists work? Explain inheritance...",
-        height=100
-    )
-
-    if st.button("Get Explanation", type="primary", disabled=not question):
-        with st.spinner(f"{selected_persona} is preparing your explanation..."):
-            try:
-                explanation = create_crew(selected_persona, question)
-                st.session_state.explanation = explanation
-
-                # Award XP and affinity
-                xp_gained = 10
-                level_up = add_xp(st.session_state.user_progress, xp_gained, st.session_state)
-                add_affinity(st.session_state.user_progress, selected_persona, 5, st.session_state)
-                save_user_progress(st.session_state.user_progress)
-
-                st.session_state.show_rating = True
-
-                if level_up:
-                    st.session_state.show_reward = {
-                        'type': 'level_up',
-                        'level': st.session_state.user_progress['level']
-                    }
-
-            except Exception as e:
-                st.error(f"Error: {str(e)}")
-                st.session_state.explanation = None
+def get_next_challenge(step_id):
+    """Provide next learning challenge based on completed step"""
+    challenges = {
+        1: "Ready for the next challenge? Try creating a method that filters even numbers from a list.",
+        2: "Nice! Now let's tackle error handling. Can you add validation for null/empty lists?",
+        3: "Excellent progress! Want to combine operations? Try filter + map in one stream pipeline."
+    }
+    return challenges.get(step_id, "Want to try another Java concept?")
 
 
 def show_rating(selected_persona):
     """Rating system with slider"""
     _ensure_step_state()
     analytics = TutorAnalytics()
+
     if st.session_state.show_rating:
         st.markdown("#### How helpful was this session?")
 
@@ -305,7 +240,7 @@ def show_rating(selected_persona):
         )
 
         if st.button("Submit Rating", type="primary"):
-            # save_rating(selected_persona, rating)  # Uncomment when ready
+            save_rating(selected_persona, rating)
             st.session_state.show_rating = False
             analytics.track_click("Rate")
             st.success("Thanks for your feedback!")

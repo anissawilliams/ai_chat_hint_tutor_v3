@@ -28,16 +28,16 @@ def render_sidebar(user_level, user_xp, user_streak, persona_avatars, historical
 
         st.divider()
 
-        # =================
-        # Page Navigation
-        # =================
-        st.header("📂 Pages")
-        if st.button("🏠 Home"):
-            navigate_to("Home")
-        if st.button("📊 Analytics Dashboard"):
-            navigate_to("Analytics")
-        if st.button("💾 Code Snippets Library"):
-            navigate_to("Snippets")
+        # # =================
+        # # Page Navigation
+        # # =================
+        # st.header("📂 Pages")
+        # if st.button("🏠 Home"):
+        #     navigate_to("Home")
+        # if st.button("📊 Analytics Dashboard"):
+        #     navigate_to("Analytics")
+        # if st.button("💾 Code Snippets Library"):
+        #     navigate_to("Snippets")
 
         st.divider()
 

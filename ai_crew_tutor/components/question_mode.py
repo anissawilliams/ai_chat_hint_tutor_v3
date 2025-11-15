@@ -227,9 +227,9 @@ def show_rating(selected_persona):
     analytics = TutorAnalytics()
 
     if st.session_state.show_rating:
-        st.markdown("#### How helpful was this session?")
+        st.sidebar.markdown("#### How helpful was this session?")
 
-        rating = st.slider(
+        rating = st.sidebar.slider(
             "Rate the session",
             min_value=1,
             max_value=5,
@@ -239,7 +239,7 @@ def show_rating(selected_persona):
             key="rating_slider"
         )
 
-        if st.button("Submit Rating", type="primary"):
+        if st.sidebar.button("Submit Rating", type="primary"):
             save_rating(selected_persona, rating)
             st.session_state.show_rating = False
             analytics.track_click("Rate")

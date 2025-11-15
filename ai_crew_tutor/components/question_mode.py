@@ -35,67 +35,49 @@ def _ensure_step_state():
 
 def build_efficient_chat_context(chat_history, persona, step_info, validation_result=None):
     """
-    Build context that provides guidance upfront based on attempts and validation feedback.
-    Combines: acknowledgment + diagnosis + targeted hint/guidance + next step in ONE response.
+    Build context that includes FULL conversation history so the LLM can see what it already said.
+    This prevents repetition and allows progressive scaffolding.
     """
     attempts = step_info['attempts']
-    last_user = chat_history[-1]['content'] if chat_history else ""
 
-    # Determine guidance level based on attempts
-    if attempts == 0:
-        # First attempt: give clear structure with minimal hints
-        guidance_level = "initial"
-    elif attempts == 1:
-        # Second attempt: add inline hints and partial structure
-        guidance_level = "hints"
-    else:
-        # Third+ attempt: provide scaffolded solution with explanations
-        guidance_level = "scaffolded"
+    # Build the full conversation for context
+    conversation = ""
+    for msg in chat_history:
+        role = "Student" if msg["role"] == "user" else persona
+        conversation += f"{role}: {msg['content']}\n\n"
 
     # Build validation feedback if available
     feedback_section = ""
     if validation_result:
         is_correct, msg = validation_result
         if not is_correct:
-            feedback_section = f"\n\nValidation feedback: {msg}"
+            feedback_section = f"\n**Validation Result**: {msg}"
 
-    context = f"""You are {persona}, an efficient Java tutor who guides without over-questioning.
+    # Determine what guidance level to suggest based on attempts
+    if attempts == 0:
+        guidance_hint = "Start with high-level structure and one concrete example."
+    elif attempts == 1:
+        guidance_hint = "They've tried once. Give more specific hints: method signatures, key APIs, or a small code snippet."
+    else:
+        guidance_hint = "They're stuck. Provide a working skeleton with blanks or show the solution with explanations."
 
-INTERACTION STYLE:
-- Pack guidance into ONE comprehensive response (not multiple back-and-forths)
-- Structure: [Quick acknowledgment] → [Diagnosis] → [Targeted guidance] → [What to do next]
-- Keep total response under 200 words but information-dense
+    context = f"""You are {persona}, an efficient Java tutor. You can see the full conversation history below.
+
+CONVERSATION SO FAR:
+{conversation}
 
 CURRENT SITUATION:
-- Student attempt #{attempts + 1}
-- Student input: {last_user}{feedback_section}
-- Guidance level: {guidance_level}
+- This is attempt #{attempts + 1} at the current step
+{feedback_section}
 
-GUIDANCE BY LEVEL:
-{guidance_level == "initial" and '''
-- Ask clarifying question IF the goal is ambiguous
-- Otherwise, break down into 2-3 concrete sub-steps
-- Give one example of what the first step looks like
-- Avoid generic "think about..." questions
-''' or ''}
-{guidance_level == "hints" and '''
-- Identify what's missing/incorrect (be specific)
-- Provide inline hints: method signature template, key API methods, logic structure
-- Show a small concrete example (2-3 lines of relevant code)
-- State exactly what they should add/change next
-''' or ''}
-{guidance_level == "scaffolded" and '''
-- Provide a working code skeleton with blanks: `public List<Integer> ____(____) {{ ... }}`
-- Explain each part briefly (one sentence per section)
-- Ask them to fill in the blanks and run it
-- This gets them unstuck while still requiring active learning
-''' or ''}
-
-RULES:
-- No Socratic ping-pong; deliver actionable guidance upfront
-- Use code blocks for any code examples
+YOUR TASK:
+- Review what you've already told them (avoid repeating the same advice)
+- Look at their latest attempt and give SPECIFIC feedback on what's wrong/missing
+- {guidance_hint}
+- Keep response under 200 words but actionable
 - End with ONE clear directive: "Now try: [specific action]"
-- Be encouraging but direct
+
+IMPORTANT: Don't repeat things you already said. Build on the conversation progressively.
 
 Respond as {persona}:"""
 
@@ -170,10 +152,11 @@ def render_chat_interface(selected_persona, persona_avatars, create_crew, user_l
                 st.success("✅ Correct! Great work.")
                 st.session_state.tutor_step['attempts'] = 0
                 st.session_state.tutor_step['step_id'] += 1
+                st.session_state.chat_history = []  # Reset for next problem
                 add_xp(st.session_state.user_progress, 15, st.session_state)
                 save_user_progress(st.session_state.user_progress)
 
-                # Provide brief next step instead of just celebrating
+                # Provide brief next step
                 response = f"Perfect! Your solution works correctly. {get_next_challenge(st.session_state.tutor_step['step_id'])}"
 
                 with st.chat_message("assistant", avatar=persona_avatars.get(selected_persona, "🤖")):
@@ -187,7 +170,7 @@ def render_chat_interface(selected_persona, persona_avatars, create_crew, user_l
                 st.rerun()
                 return
 
-        # Build context and call model with efficient prompting
+        # Build context with FULL conversation history
         context = build_efficient_chat_context(
             st.session_state.chat_history,
             selected_persona,
@@ -227,9 +210,9 @@ def show_rating(selected_persona):
     analytics = TutorAnalytics()
 
     if st.session_state.show_rating:
-        st.sidebar.markdown("#### How helpful was this session?")
+        st.markdown("#### How helpful was this session?")
 
-        rating = st.sidebar.slider(
+        rating = st.slider(
             "Rate the session",
             min_value=1,
             max_value=5,
@@ -239,7 +222,7 @@ def show_rating(selected_persona):
             key="rating_slider"
         )
 
-        if st.sidebar.button("Submit Rating", type="primary"):
+        if st.button("Submit Rating", type="primary"):
             save_rating(selected_persona, rating)
             st.session_state.show_rating = False
             analytics.track_click("Rate")

@@ -236,43 +236,43 @@ def render_quick_explain(selected_persona, persona_avatars, create_crew, user_le
 
  def show_rating(selected_persona):
         # Rating system
-        analytics = TutorAnalytics()
-        if st.session_state.show_rating:
-            st.markdown("#### How helpful was this session?")
-            col1, col2, col3, col4, col5 = st.columns(5)
+    analytics = TutorAnalytics()
+    if st.session_state.show_rating:
+        st.markdown("#### How helpful was this session?")
+        col1, col2, col3, col4, col5 = st.columns(5)
 
-            with col1:
-                if st.button("⭐", key="rate_1"):
-                    #save_rating(selected_persona, user_input, 1)
-                    st.session_state.show_rating = False
-                    analytics.track_click("Rate")
-                    st.success("Thanks for your feedback!")
-                    st.rerun()
-            with col2:
-                if st.button("⭐⭐", key="rate_2"):
-                    #save_rating(selected_persona, question, 2)
-                    st.session_state.show_rating = False
-                    analytics.track_click("Rate")
-                    st.success("Thanks for your feedback!")
-                    st.rerun()
-            with col3:
-                if st.button("⭐⭐⭐", key="rate_3"):
-                    #save_rating(selected_persona, question, 3)
-                    st.session_state.show_rating = False
-                    analytics.track_click("Rate")
-                    st.success("Thanks for your feedback!")
-                    st.rerun()
-            with col4:
-                if st.button("⭐⭐⭐⭐", key="rate_4"):
-                    #save_rating(selected_persona, question, 4)
-                    st.session_state.show_rating = False
-                    analytics.track_click("Rate")
-                    st.success("Thanks for your feedback!")
-                    st.rerun()
-            with col5:
-                if st.button("⭐⭐⭐⭐⭐", key="rate_5"):
-                    #save_rating(selected_persona, question, 5)
-                    st.session_state.show_rating = False
-                    analytics.track_click("Rate")
-                    st.success("Thanks for your feedback!")
-                    st.rerun()
+        with col1:
+            if st.button("⭐", key="rate_1"):
+                 #save_rating(selected_persona, user_input, 1)
+                st.session_state.show_rating = False
+                analytics.track_click("Rate")
+                st.success("Thanks for your feedback!")
+                st.rerun()
+        with col2:
+            if st.button("⭐⭐", key="rate_2"):
+                 #save_rating(selected_persona, question, 2)
+                st.session_state.show_rating = False
+                analytics.track_click("Rate")
+                st.success("Thanks for your feedback!")
+                st.rerun()
+        with col3:
+            if st.button("⭐⭐⭐", key="rate_3"):
+                #save_rating(selected_persona, question, 3)
+                st.session_state.show_rating = False
+                analytics.track_click("Rate")
+                st.success("Thanks for your feedback!")
+                st.rerun()
+        with col4:
+            if st.button("⭐⭐⭐⭐", key="rate_4"):
+                #save_rating(selected_persona, question, 4)
+                st.session_state.show_rating = False
+                analytics.track_click("Rate")
+                st.success("Thanks for your feedback!")
+                st.rerun()
+        with col5:
+            if st.button("⭐⭐⭐⭐⭐", key="rate_5"):
+                #save_rating(selected_persona, question, 5)
+                st.session_state.show_rating = False
+                analytics.track_click("Rate")
+                st.success("Thanks for your feedback!")
+                st.rerun()

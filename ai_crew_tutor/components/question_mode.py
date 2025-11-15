@@ -9,9 +9,9 @@ from utils.gamification import add_xp, add_affinity
 from utils.storage import save_user_progress, save_rating
 from utils.data_collection import TutorAnalytics
 from utils.java_code_validator import (
-    java_validator_factory_diagnostic,
-    signature_check_diagnostic,
-    content_check_diagnostic
+    java_validator_factory,
+    signature_check,
+    content_check
 )
 
 

@@ -35,8 +35,8 @@ def render_question_mode(selected_persona, persona_avatars, create_crew, user_le
 
     # else:
     #     render_quick_explain(selected_persona, persona_avatars, create_crew, user_level)
-
     show_rating(selected_persona)
+
 def render_chat_interface(selected_persona, persona_avatars, create_crew, user_level):
     """Render interactive chat-based guided learning"""
 
@@ -61,8 +61,10 @@ def render_chat_interface(selected_persona, persona_avatars, create_crew, user_l
 
     # Display chat history
     for message in st.session_state.chat_history:
-        with st.chat_message(message["role"],
-                             avatar=message.get("avatar", "🧑‍💻" if message["role"] == "user" else "🤖")):
+        with st.chat_message(
+            message["role"],
+            avatar=message.get("avatar", "🧑‍💻" if message["role"] == "user" else "🤖")
+        ):
             st.markdown(message["content"])
 
     # Chat input
@@ -188,6 +190,7 @@ Conversation history:
         st.session_state.show_rating = True
     return context
 
+
 def render_quick_explain(selected_persona, persona_avatars, create_crew, user_level):
     """Render the original quick explanation mode"""
 
@@ -208,8 +211,7 @@ def render_quick_explain(selected_persona, persona_avatars, create_crew, user_le
                 # Award XP and affinity
                 xp_gained = 10
                 level_up = add_xp(st.session_state.user_progress, xp_gained, st.session_state)
-                add_affinity(st.session_state.user_progress, selected_persona, 5,
-                             st.session_state)  # ← Add st.session_state here
+                add_affinity(st.session_state.user_progress, selected_persona, 5, st.session_state)
                 save_user_progress(st.session_state.user_progress)
 
                 st.session_state.show_rating = True
@@ -224,55 +226,25 @@ def render_quick_explain(selected_persona, persona_avatars, create_crew, user_le
                 st.error(f"Error: {str(e)}")
                 st.session_state.explanation = None
 
-    # # Display explanation
-    # if st.session_state.explanation:
-    #     st.markdown("---")
-    #     st.markdown(f"""
-    #     <div class="explanation-box">
-    #         <h4>{persona_avatars.get(selected_persona, '🤖')} {selected_persona}'s Explanation</h4>
-    #         {st.session_state.explanation}
-    #     </div>
-    #     """, unsafe_allow_html=True)
 
- def show_rating(selected_persona):
-        # Rating system
+def show_rating(selected_persona):
+    """Rating system with slider"""
     analytics = TutorAnalytics()
     if st.session_state.show_rating:
         st.markdown("#### How helpful was this session?")
-        col1, col2, col3, col4, col5 = st.columns(5)
 
-        with col1:
-            if st.button("⭐", key="rate_1"):
-                 #save_rating(selected_persona, user_input, 1)
-                st.session_state.show_rating = False
-                analytics.track_click("Rate")
-                st.success("Thanks for your feedback!")
-                st.rerun()
-        with col2:
-            if st.button("⭐⭐", key="rate_2"):
-                 #save_rating(selected_persona, question, 2)
-                st.session_state.show_rating = False
-                analytics.track_click("Rate")
-                st.success("Thanks for your feedback!")
-                st.rerun()
-        with col3:
-            if st.button("⭐⭐⭐", key="rate_3"):
-                #save_rating(selected_persona, question, 3)
-                st.session_state.show_rating = False
-                analytics.track_click("Rate")
-                st.success("Thanks for your feedback!")
-                st.rerun()
-        with col4:
-            if st.button("⭐⭐⭐⭐", key="rate_4"):
-                #save_rating(selected_persona, question, 4)
-                st.session_state.show_rating = False
-                analytics.track_click("Rate")
-                st.success("Thanks for your feedback!")
-                st.rerun()
-        with col5:
-            if st.button("⭐⭐⭐⭐⭐", key="rate_5"):
-                #save_rating(selected_persona, question, 5)
-                st.session_state.show_rating = False
-                analytics.track_click("Rate")
-                st.success("Thanks for your feedback!")
-                st.rerun()
+        rating = st.slider(
+            "Rate the session",
+            min_value=1,
+            max_value=5,
+            value=3,
+            step=1,
+            format="%d ⭐"
+        )
+
+        if st.button("Submit Rating", type="primary"):
+            # save_rating(selected_persona, rating)  # Uncomment when ready
+            st.session_state.show_rating = False
+            analytics.track_click("Rate")
+            st.success("Thanks for your feedback!")
+            st.rerun()

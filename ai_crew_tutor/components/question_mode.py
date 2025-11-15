@@ -8,7 +8,7 @@ import streamlit as st
 from utils.gamification import add_xp, add_affinity
 from utils.storage import save_user_progress, save_rating
 from utils.data_collection import TutorAnalytics
-from utils.java_code_validator import java_validator_factory
+from utils.java_code_validator import java_validator_factory_diagnostic
 
 
 # -----------------------

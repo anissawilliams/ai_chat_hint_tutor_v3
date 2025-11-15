@@ -71,11 +71,19 @@ def build_efficient_chat_context(chat_history, persona, step_info, validation_re
 - Give a partial implementation with blanks (e.g., "public List<Integer> transform(List<Integer> nums) { return nums.stream().map(____ -> ____ * 2).collect(____); }")
 - Explain what each blank should be
 - Ask them to fill in the blanks and test"""
-    else:
-        strategy = """FOURTH+ INTERACTION - Complete Scaffold:
+    elif attempts == 3:
+        strategy = """FOURTH INTERACTION - Working Solution with Explanation:
 - Provide working code with detailed line-by-line explanation
 - Explain WHY each part works
-- Ask them to modify it slightly (e.g., "Now change it to triple the numbers instead of double")"""
+- Ask them to run it and then modify it slightly (e.g., "Now change it to triple the numbers instead of double")
+- Keep encouraging them to try the variation"""
+    else:
+        strategy = """FIFTH+ INTERACTION - Keep Supporting:
+- They have the solution now, so help them understand it better or debug their variation
+- Ask what specific part is confusing
+- Provide more examples or edge cases to try
+- Suggest extensions: "What if the list had null values? How would you handle that?"
+- NEVER give up - always find a new angle to explore or variation to try"""
 
     context = f"""You are {persona}, an efficient Java tutor who guides students through problems progressively.
 
@@ -96,6 +104,7 @@ CRITICAL RULES:
 4. Always end with a specific question or directive to keep conversation flowing
 5. Use code blocks for any code examples
 6. Be encouraging but don't hand-hold excessively
+7. NEVER GIVE UP - Even after showing the solution, continue helping them understand, debug variations, or explore extensions
 
 Respond as {persona} and keep the conversation going:"""
 

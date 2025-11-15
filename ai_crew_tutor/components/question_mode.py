@@ -193,7 +193,7 @@ def render_chat_interface(selected_persona, persona_avatars, create_crew, user_l
 
     # --- Example: configure validator for this exercise ---
     if 'current_expected_pattern' not in st.session_state:
-        st.session_state['current_expected_pattern'] = java_validator_factory_diagnostic(
+        st.session_state['current_expected_pattern'] = java_validator_factory(
             method_name="doubleNumbers",
             return_type="List<Integer>",
             param_types=["List<Integer>"],

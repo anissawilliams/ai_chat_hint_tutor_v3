@@ -121,7 +121,19 @@ def render_chat_interface(selected_persona, persona_avatars, create_crew, user_l
     _ensure_step_state()
     analytics = TutorAnalytics()
 
-    st.markdown(f"### 💬 Chat with {persona_avatars.get(selected_persona, '🤖')} {selected_persona}")
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.markdown(f"### 💬 Chat with {persona_avatars.get(selected_persona, '🤖')} {selected_persona}")
+    with col2:
+        if st.button("🗑️ Clear Chat", key="clear_chat"):
+            st.session_state.chat_history = []
+            st.session_state.tutor_step = {
+                'step_id': 0,
+                'attempts': 0,
+                'last_validation_result': None
+            }
+            st.rerun()
+
     st.caption("Describe what you're trying to build - I'll guide you through it step-by-step!")
 
     # Initialize chat history

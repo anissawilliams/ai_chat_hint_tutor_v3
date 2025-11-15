@@ -28,12 +28,15 @@ def render_question_mode(selected_persona, persona_avatars, create_crew, user_le
     st.divider()
 
     # Initialize chat mode state
-    if st.session_state.get('chat_mode', False):
+    if st.session_state.get('chat_mode', True):
         render_chat_interface(selected_persona, persona_avatars, create_crew, user_level)
+        analytics.track_click("Chat Mode")
+
+
     # else:
     #     render_quick_explain(selected_persona, persona_avatars, create_crew, user_level)
 
-
+    show_rating(selected_persona)
 def render_chat_interface(selected_persona, persona_avatars, create_crew, user_level):
     """Render interactive chat-based guided learning"""
 
@@ -122,7 +125,7 @@ def render_chat_interface(selected_persona, persona_avatars, create_crew, user_l
 
 def build_chat_context(chat_history, persona):
     """Build conversation context for the AI"""
-
+    analytics = TutorAnalytics()
     # If this is the first message, provide initial instructions
     if len(chat_history) <= 1:
         context = f"""You are {persona}, a Java tutor using guided learning methodology.
@@ -182,14 +185,14 @@ Conversation history:
                 context += f"\n{persona}: {msg['content']}\n"
 
         context += f"\n{persona} (guide with ONE question, wait for response):"
-
+        st.session_state.show_rating = True
     return context
 
 def render_quick_explain(selected_persona, persona_avatars, create_crew, user_level):
     """Render the original quick explanation mode"""
 
     st.markdown(f"### ⚡ Quick Explanation with {persona_avatars.get(selected_persona, '🤖')} {selected_persona}")
-
+    analytics = TutorAnalytics()
     question = st.text_area(
         "What Java concept would you like explained?",
         placeholder="e.g., What are generics? How do ArrayLists work? Explain inheritance...",
@@ -221,48 +224,55 @@ def render_quick_explain(selected_persona, persona_avatars, create_crew, user_le
                 st.error(f"Error: {str(e)}")
                 st.session_state.explanation = None
 
-    # Display explanation
-    if st.session_state.explanation:
-        st.markdown("---")
-        st.markdown(f"""
-        <div class="explanation-box">
-            <h4>{persona_avatars.get(selected_persona, '🤖')} {selected_persona}'s Explanation</h4>
-            {st.session_state.explanation}
-        </div>
-        """, unsafe_allow_html=True)
+    # # Display explanation
+    # if st.session_state.explanation:
+    #     st.markdown("---")
+    #     st.markdown(f"""
+    #     <div class="explanation-box">
+    #         <h4>{persona_avatars.get(selected_persona, '🤖')} {selected_persona}'s Explanation</h4>
+    #         {st.session_state.explanation}
+    #     </div>
+    #     """, unsafe_allow_html=True)
 
+ def show_rating(selected_persona):
         # Rating system
+        analytics = TutorAnalytics()
         if st.session_state.show_rating:
-            st.markdown("#### How helpful was this explanation?")
+            st.markdown("#### How helpful was this session?")
             col1, col2, col3, col4, col5 = st.columns(5)
 
             with col1:
                 if st.button("⭐", key="rate_1"):
-                    save_rating(selected_persona, question, 1)
+                    #save_rating(selected_persona, user_input, 1)
                     st.session_state.show_rating = False
+                    analytics.track_click("Rate")
                     st.success("Thanks for your feedback!")
                     st.rerun()
             with col2:
                 if st.button("⭐⭐", key="rate_2"):
-                    save_rating(selected_persona, question, 2)
+                    #save_rating(selected_persona, question, 2)
                     st.session_state.show_rating = False
+                    analytics.track_click("Rate")
                     st.success("Thanks for your feedback!")
                     st.rerun()
             with col3:
                 if st.button("⭐⭐⭐", key="rate_3"):
-                    save_rating(selected_persona, question, 3)
+                    #save_rating(selected_persona, question, 3)
                     st.session_state.show_rating = False
+                    analytics.track_click("Rate")
                     st.success("Thanks for your feedback!")
                     st.rerun()
             with col4:
                 if st.button("⭐⭐⭐⭐", key="rate_4"):
-                    save_rating(selected_persona, question, 4)
+                    #save_rating(selected_persona, question, 4)
                     st.session_state.show_rating = False
+                    analytics.track_click("Rate")
                     st.success("Thanks for your feedback!")
                     st.rerun()
             with col5:
                 if st.button("⭐⭐⭐⭐⭐", key="rate_5"):
-                    save_rating(selected_persona, question, 5)
+                    #save_rating(selected_persona, question, 5)
                     st.session_state.show_rating = False
+                    analytics.track_click("Rate")
                     st.success("Thanks for your feedback!")
                     st.rerun()

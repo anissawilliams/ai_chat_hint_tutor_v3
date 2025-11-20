@@ -99,29 +99,51 @@ def build_tutor_context(chat_history, persona):
         role = "Student" if msg["role"] == "user" else persona
         conversation += f"{role}: {msg['content']}\n\n"
 
-    # Simple, effective instruction
-    context = f"""You are {persona}, a friendly and efficient Java tutor.
+    # Count how many messages (to determine if this is the first interaction)
+    is_first_message = len([m for m in chat_history if m["role"] == "user"]) == 1
+
+    # Adjust guidance based on whether student has submitted code yet
+    has_submitted_code = any(looks_like_code(msg["content"]) for msg in chat_history if msg["role"] == "user")
+
+    if is_first_message and not has_submitted_code:
+        # First interaction - they're asking what to build
+        guidance = """🎯 THIS IS THEIR FIRST MESSAGE - GUIDE, DON'T SOLVE:
+⚠️ DO NOT give them the complete solution! They haven't tried yet.
+
+Instead:
+1. Acknowledge what they want to build
+2. Break it into 2-3 simple steps (e.g., "1. Method signature, 2. Add logic, 3. Return result")
+3. Give ONE small hint (e.g., "You'll use the + operator")
+4. Ask them to try writing it and paste their code
+
+FORBIDDEN: Do NOT show complete working code. Let them try first!"""
+    elif not has_submitted_code:
+        # They're still discussing, haven't coded yet
+        guidance = """They're still discussing the approach. Give another hint or example of the PATTERN (not complete solution).
+Ask them to try coding it now."""
+    else:
+        # They've submitted code - now you can be more helpful
+        guidance = """They've submitted code! Now you can:
+- Point out what's good and what needs fixing
+- Show corrected versions or examples
+- Be specific about what to change"""
+
+    context = f"""You are {persona}, a friendly Java tutor who guides students to discover solutions.
 
 CONVERSATION SO FAR:
 {conversation}
 
-YOUR TEACHING STYLE:
-- Be conversational and encouraging, not pedantic
-- If the student provides working code (even with minor style issues), celebrate it and move forward
-- Don't obsess over naming conventions or minor style - focus on whether it works
-- Give concrete, specific help when they're stuck
+YOUR GUIDANCE FOR THIS RESPONSE:
+{guidance}
+
+TEACHING PRINCIPLES:
+- Be encouraging and conversational
+- When they submit code, give specific feedback
+- Don't obsess over style - focus on functionality
 - Keep responses under 150 words
-- Always end with a question or next step
-- Use code blocks for examples
+- Always end with a clear question or action item
 
-IMPORTANT RULES:
-1. Review what you already said - don't repeat yourself
-2. If their code is basically correct, acknowledge success and suggest what to try next
-3. If they're stuck, give ONE clear hint or example
-4. Don't split hairs over style - focus on functionality
-5. Move the conversation forward, don't keep asking for the same thing
-
-Respond as {persona}, keeping it friendly and moving forward:"""
+Respond as {persona}:"""
 
     return context
 

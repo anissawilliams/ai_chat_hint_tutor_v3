@@ -13,7 +13,7 @@ from streamlit import session_state
 
 from . import levels
 
-print("✅ crew.py loaded")
+print("✅ crew.py loaded!")
 
 # 🔧 Base paths
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

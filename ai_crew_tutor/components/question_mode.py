@@ -40,6 +40,12 @@ def build_efficient_chat_context(chat_history, persona, step_info, validation_re
     """
     attempts = step_info['attempts']
 
+    # Build the full conversation for context
+    conversation = ""
+    for msg in chat_history:
+        role = "Student" if msg["role"] == "user" else persona
+        conversation += f"{role}: {msg['content']}\n\n"
+
     # Build validation feedback if available
     feedback_section = ""
     if validation_result:
@@ -48,13 +54,6 @@ def build_efficient_chat_context(chat_history, persona, step_info, validation_re
             feedback_section = f"\n**✅ VALIDATION: CODE IS CORRECT - Student solved it! Congratulate and move to next challenge.**"
         else:
             feedback_section = f"\n**❌ VALIDATION: Code has issues - {msg}**\n**Continue guiding based on attempt #{attempts + 1} strategy below.**"
-
-    # Build validation feedback if available
-    feedback_section = ""
-    if validation_result:
-        is_correct, msg = validation_result
-        if not is_correct:
-            feedback_section = f"\n**Validation Result**: {msg}"
 
     # Progressive scaffolding strategy based on attempts
     if attempts == 0:
@@ -88,7 +87,7 @@ def build_efficient_chat_context(chat_history, persona, step_info, validation_re
 - Suggest extensions: "What if the list had null values? How would you handle that?"
 - NEVER give up - always find a new angle to explore or variation to try"""
 
-    ccontext = f"""You are {persona}, an efficient Java tutor who guides students through problems progressively.
+    context = f"""You are {persona}, an efficient Java tutor who guides students through problems progressively.
 
 CONVERSATION SO FAR:
 {conversation}
@@ -110,6 +109,8 @@ CRITICAL RULES:
 7. Use code blocks for any code examples
 
 Respond as {persona}:"""
+
+    return context
 
 
 # -----------------------

@@ -309,7 +309,7 @@ def show_rating(selected_persona):
         )
 
         if st.button("Submit Rating", type="primary"):
-            save_rating(selected_persona, rating)
+            #save_rating(selected_persona, rating)
             st.session_state.show_rating = False
             analytics.track_click("Rate")
             st.success("Thanks for your feedback!")

@@ -5,6 +5,19 @@ tasks:
     expected_output: "A clear, engaging explanation using your persona's metaphors for beginners."
 
   guided_learning:
-    name: "Guided Learning"
-    description: "In a chat format, provide hints on the {query} but don't give the answer until the student has it"
-    expected_output: "A clear, step-by-step conversation in your persona's metaphors to guide the learner but no full answer given"
+    name: "Guided Java Learning"
+    description: |
+      {query}
+
+      CRITICAL INSTRUCTIONS:
+      1. READ THE FULL CONVERSATION HISTORY ABOVE to see what the student has already tried
+      2. If validation shows their code is CORRECT, congratulate them and move to next challenge
+      3. If validation shows their code is INCORRECT, follow the scaffolding strategy for the current attempt number
+      4. NEVER repeat hints you already gave - build on previous guidance
+      5. Keep response under 150 words and conversational
+      6. End with a specific question or action item
+    expected_output: |
+      A conversational response that:
+      - Acknowledges the student's current attempt
+      - Provides appropriate guidance for their attempt number
+      - Keeps the conversation flowing with a question or directive

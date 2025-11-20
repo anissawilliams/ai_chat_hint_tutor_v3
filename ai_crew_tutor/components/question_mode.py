@@ -40,11 +40,14 @@ def build_efficient_chat_context(chat_history, persona, step_info, validation_re
     """
     attempts = step_info['attempts']
 
-    # Build the full conversation for context
-    conversation = ""
-    for msg in chat_history:
-        role = "Student" if msg["role"] == "user" else persona
-        conversation += f"{role}: {msg['content']}\n\n"
+    # Build validation feedback if available
+    feedback_section = ""
+    if validation_result:
+        is_correct, msg = validation_result
+        if is_correct:
+            feedback_section = f"\n**✅ VALIDATION: CODE IS CORRECT - Student solved it! Congratulate and move to next challenge.**"
+        else:
+            feedback_section = f"\n**❌ VALIDATION: Code has issues - {msg}**\n**Continue guiding based on attempt #{attempts + 1} strategy below.**"
 
     # Build validation feedback if available
     feedback_section = ""
@@ -85,7 +88,7 @@ def build_efficient_chat_context(chat_history, persona, step_info, validation_re
 - Suggest extensions: "What if the list had null values? How would you handle that?"
 - NEVER give up - always find a new angle to explore or variation to try"""
 
-    context = f"""You are {persona}, an efficient Java tutor who guides students through problems progressively.
+    ccontext = f"""You are {persona}, an efficient Java tutor who guides students through problems progressively.
 
 CONVERSATION SO FAR:
 {conversation}
@@ -98,17 +101,15 @@ YOUR SCAFFOLDING STRATEGY FOR THIS ATTEMPT:
 {strategy}
 
 CRITICAL RULES:
-1. NEVER give the complete working solution before attempt #4
-2. Review what you already said - build on it, don't repeat
-3. Keep responses conversational and under 150 words
-4. Always end with a specific question or directive to keep conversation flowing
-5. Use code blocks for any code examples
-6. Be encouraging but don't hand-hold excessively
-7. NEVER GIVE UP - Even after showing the solution, continue helping them understand, debug variations, or explore extensions
+1. READ the conversation above - the student just responded with: "{chat_history[-1]['content']}"
+2. If validation shows ✅ CORRECT: STOP giving hints, congratulate them, acknowledge success
+3. If validation shows ❌ INCORRECT or no validation: Follow the scaffolding strategy above
+4. NEVER repeat yourself - review what you said in previous messages
+5. Keep responses under 150 words
+6. Always end with a specific question or directive
+7. Use code blocks for any code examples
 
-Respond as {persona} and keep the conversation going:"""
-
-    return context
+Respond as {persona}:"""
 
 
 # -----------------------
@@ -178,8 +179,9 @@ def render_chat_interface(selected_persona, persona_avatars, create_crew, user_l
         validation_result = None
 
         # Only validate if input looks like code (contains common code patterns)
+        # Only validate if input looks like code (contains common code patterns)
         looks_like_code = any(pattern in user_input.lower() for pattern in
-                             ['public', 'private', 'return', 'void', '{', 'list', 'stream'])
+                              ['public', 'private', 'return', 'void', '{', 'list', 'stream', 'int ', '=', ';'])
 
         if validator and callable(validator) and looks_like_code:
             res = validator(user_input)

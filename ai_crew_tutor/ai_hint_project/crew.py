@@ -35,7 +35,6 @@ def get_llm():
         model="gpt-5-mini",
         api_key=st.secrets["OPENAI_API_KEY"],
         temperature=0.7,
-        max_tokens=300
     )
 
 llm = get_llm()

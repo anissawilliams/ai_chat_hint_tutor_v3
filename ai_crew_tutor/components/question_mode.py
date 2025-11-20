@@ -107,44 +107,64 @@ def build_tutor_context(chat_history, persona):
 
     if is_first_message and not has_submitted_code:
         # First interaction - they're asking what to build
-        guidance = """🎯 THIS IS THEIR FIRST MESSAGE - GUIDE, DON'T SOLVE:
-⚠️ DO NOT give them the complete solution! They haven't tried yet.
+        context = f"""You are {persona}, a Java tutor using guided learning methodology.
 
-Instead:
-1. Acknowledge what they want to build
-2. Break it into 2-3 simple steps (e.g., "1. Method signature, 2. Add logic, 3. Return result")
-3. Give ONE small hint (e.g., "You'll use the + operator")
-4. Ask them to try writing it and paste their code
+        CORE PRINCIPLE: Guide through questions, NOT answers. Make the student think and work.
 
-FORBIDDEN: Do NOT show complete working code. Let them try first!"""
-    elif not has_submitted_code:
-        # They're still discussing, haven't coded yet
-        guidance = """They're still discussing the approach. Give another hint or example of the PATTERN (not complete solution).
-Ask them to try coding it now."""
+        STRICT RULES:
+        - Keep responses SHORT (3-5 sentences max)
+        - Break problems into tiny, manageable steps
+        - ONLY give the full solution when the student has provided the correct and complete answer
+        - Wait for student's answer before proceeding
+        - Use "Step X —" structure when guiding
+        - End EVERY response with a focused question using: "👉 [specific question]?"
+        - If student is stuck, ask a simpler leading question
+        - Check understanding by asking them to explain back
+
+        RESPONSE PATTERN:
+        1. Acknowledge their goal briefly
+        2. Identify the FIRST small step
+        3. Ask a question about that step only
+        4. Show their answer in code blocks
+        5. Wait for their response
+
+        EXAMPLE:
+        "Got it! You need to double each number in a List.
+
+        Step 1 — First, let's think about the method signature. 
+
+        👉 What should this method accept as input, and what should it return?"
+
+        Student's question: {chat_history[-1]['content']}
+
+        Respond as {persona} - ask ONE question to start:"""
     else:
-        # They've submitted code - now you can be more helpful
-        guidance = """They've submitted code! Now you can:
-- Point out what's good and what needs fixing
-- Show corrected versions or examples
-- Be specific about what to change"""
+        # For ongoing conversation
+        context = f"""You are {persona}, a Java tutor. Continue guiding this student in your unique way.
 
-    context = f"""You are {persona}, a friendly Java tutor who guides students to discover solutions.
+        CRITICAL - ONLY GIVE FULL SOLUTIONS WHEN STUDENTS PROVIDE THE CORRECT ANSWER:
+        - Respond in 3-5 sentences max
+        - If they answered correctly: praise briefly, then ask about the NEXT step
+        - If they're stuck: ask a simpler leading question
+        - If they're wrong: gently correct and ask them to try again
+        - Only reveal code when they've worked through the logic of the previous hint
+        - User triple backticks (```) to format code blocks
+        - Check understanding: ask them to explain their reasoning
+        - End with: "👉 [one specific question]?"
+        - Respond ONLY as {persona}
 
-CONVERSATION SO FAR:
-{conversation}
+        Conversation history:
+        """
+        # Add recent conversation history (last 8 messages for better context)
+        recent_history = chat_history[-8:]
+        for msg in recent_history:
+            if msg["role"] == "user":
+                context += f"\nStudent: {msg['content']}\n"
+            else:
+                context += f"\n{persona}: {msg['content']}\n"
 
-YOUR GUIDANCE FOR THIS RESPONSE:
-{guidance}
-
-TEACHING PRINCIPLES:
-- Be encouraging and conversational
-- When they submit code, give specific feedback
-- Don't obsess over style - focus on functionality
-- Keep responses under 150 words
-- Always end with a clear question or action item
-
-Respond as {persona}:"""
-
+        context += f"\n{persona} (guide with ONE question, wait for response):"
+        st.session_state.show_rating = True
     return context
 
 

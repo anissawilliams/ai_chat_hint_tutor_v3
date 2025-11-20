@@ -26,10 +26,6 @@ import json
 # Retrieve the OpenAI API key from Streamlit secrets
 OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 
-# Retrieve the OpenAI API key from Streamlit secrets
-OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
-
-
 def get_llm():
     return ChatOpenAI(
         model="gpt-5-mini",

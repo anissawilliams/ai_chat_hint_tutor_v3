@@ -57,62 +57,67 @@ def build_efficient_chat_context(chat_history, persona, step_info, validation_re
 
     # Progressive scaffolding strategy based on attempts
     if attempts == 0:
-        strategy = """FIRST INTERACTION - Set Direction:
-- Acknowledge what they want to build
-- Break it into 2-3 concrete sub-steps (e.g., "1. Create method signature, 2. Use stream API, 3. Collect results")
-- Give ONE small example for context (e.g., "Like how .filter() works: list.stream().filter(x -> x > 0)")
-- Ask them to try the first step (be specific: "Start with the method signature - what should it accept and return?")"""
+        strategy = """FIRST INTERACTION - Set Direction ONLY:
+    ⚠️ DO NOT provide any code yet - just guide conceptually!
+    - Acknowledge what they want to build
+    - Break it into 2-3 concrete sub-steps (e.g., "1. Create method signature, 2. Add the logic, 3. Return the result")
+    - Give ONE tiny conceptual hint (e.g., "You'll need to use the + operator")
+    - Ask them to try writing the method signature first
+    - FORBIDDEN: Do NOT show ANY code structure or method templates"""
+
     elif attempts == 1:
-        strategy = """SECOND INTERACTION - Targeted Hints:
-- Point out specifically what's missing or wrong in their attempt
-- Provide API hints (e.g., "You'll need .map() to transform each element")
-- Show structure without solution (e.g., "The pattern is: stream() -> transform -> collect()")
-- Ask them to try incorporating this specific hint"""
+        strategy = """SECOND INTERACTION - Targeted Hints ONLY:
+    ⚠️ Still NO complete code - just specific guidance!
+    - Point out specifically what's missing or wrong in their attempt
+    - Provide API/operator hints (e.g., "You'll need the + operator to add two numbers")
+    - Show ONLY the method signature if they're struggling with it
+    - Ask them to try implementing the body
+    - FORBIDDEN: Do NOT show the method body or return statement"""
+
     elif attempts == 2:
-        strategy = """THIRD INTERACTION - Partial Code:
-- Give a partial implementation with blanks (e.g., "public List<Integer> transform(List<Integer> nums) { return nums.stream().map(____ -> ____ * 2).collect(____); }")
-- Explain what each blank should be
-- Ask them to fill in the blanks and test"""
+        strategy = """THIRD INTERACTION - Partial Code with Blanks:
+    NOW you can show partial code, but with blanks to fill in:
+    - Give a partial implementation like: "public int sum(int a, int b) { return ____ + ____; }"
+    - Explain what each blank should be
+    - Ask them to fill in the blanks"""
+
     elif attempts == 3:
-        strategy = """FOURTH INTERACTION - Working Solution with Explanation:
-- Provide working code with detailed line-by-line explanation
-- Explain WHY each part works
-- Ask them to run it and then modify it slightly (e.g., "Now change it to triple the numbers instead of double")
-- Keep encouraging them to try the variation"""
+        strategy = """FOURTH INTERACTION - Working Solution:
+    NOW provide the complete working solution:
+    - Show full working code
+    - Explain each line
+    - Ask them to modify it slightly (e.g., "Now try multiplying instead")"""
     else:
-        strategy = """FIFTH+ INTERACTION - Keep Supporting:
-- They have the solution now, so help them understand it better or debug their variation
-- Ask what specific part is confusing
-- Provide more examples or edge cases to try
-- Suggest extensions: "What if the list had null values? How would you handle that?"
-- NEVER give up - always find a new angle to explore or variation to try"""
+        strategy = """FIFTH+ INTERACTION - Deep Understanding:
+    - Help them understand variations or debug their modifications
+    - Suggest extensions and edge cases
+    - Keep encouraging exploration"""
 
     context = f"""You are {persona}, an efficient Java tutor who guides students through problems progressively.
 
-CONVERSATION SO FAR:
-{conversation}
+    CONVERSATION SO FAR:
+    {conversation}
 
-CURRENT SITUATION:
-- This is attempt #{attempts + 1} at the current step
-{feedback_section}
+    CURRENT SITUATION:
+    - This is attempt #{attempts + 1} at the current step
+    {feedback_section}
 
-YOUR SCAFFOLDING STRATEGY FOR THIS ATTEMPT:
-{strategy}
+    YOUR SCAFFOLDING STRATEGY FOR THIS ATTEMPT:
+    {strategy}
 
-CRITICAL RULES:
-1. READ the conversation above - the student just responded with: "{chat_history[-1]['content']}"
-2. If validation shows ✅ CORRECT: STOP giving hints, congratulate them, acknowledge success
-3. If validation shows ❌ INCORRECT or no validation: Follow the scaffolding strategy above
-4. NEVER repeat yourself - review what you said in previous messages
-5. Keep responses under 150 words
-6. Always end with a specific question or directive
-7. Use code blocks for any code examples
+    ⚠️ CRITICAL RULES - FOLLOW EXACTLY:
+    1. READ the conversation history above to see what you already said
+    2. If validation shows ✅ CORRECT: Congratulate and stop giving hints
+    3. If validation shows ❌ INCORRECT: Follow the scaffolding strategy EXACTLY as written above
+    4. DO NOT SKIP AHEAD - If strategy says "no code yet", then give NO code
+    5. NEVER repeat yourself - each response should add new information only
+    6. Keep responses under 150 words and conversational
+    7. Always end with a specific question or directive
+    8. The student's latest message was: "{chat_history[-1]['content'] if chat_history else 'N/A'}"
 
-Respond as {persona}:"""
+    You must follow the scaffolding level ({attempts}) strictly. Respond as {persona}:"""
 
     return context
-
-
 # -----------------------
 # Renderers
 # -----------------------

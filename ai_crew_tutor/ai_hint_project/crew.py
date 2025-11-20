@@ -40,13 +40,13 @@ def get_llm():
 
 
 
-# Test the LLM call
-llm_response = get_llm()
 
-if llm_response:
-    print("Generated Text:", llm_response[0]['generated_text'])
-else:
-    print("⚠️ Unable to generate text, using fallback.")
+
+    # Test the LLM call properly
+llm = get_llm()
+test_response = llm.invoke("Hello, OpenAI! Can you help me?")
+print("Generated Text:", test_response.content)
+
 
 
 # Rest of your code stays the same...

@@ -29,24 +29,18 @@ OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 # Retrieve the OpenAI API key from Streamlit secrets
 OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 
+
 def get_llm():
-    """Return a ChatOpenAI instance for CrewAI agents."""
     return ChatOpenAI(
         model="gpt-5-mini",
-        api_key=OPENAI_API_KEY,
+        api_key=st.secrets["OPENAI_API_KEY"],
         temperature=0.7,
         max_tokens=300
     )
 
-
-
-
-
-    # Test the LLM call properly
 llm = get_llm()
-test_response = llm.invoke("Hello, OpenAI! Can you help me?")
-print("Generated Text:", test_response.content)
-
+resp = llm.invoke("Say hello as a Java tutor.")
+print(resp.content)
 
 
 # Rest of your code stays the same...
@@ -118,8 +112,8 @@ def create_crew(persona: str, tutoring_context: str):
         raise ValueError(f"Unknown persona: {persona}")
 
     # Get the LLM instance (ChatOpenAI with GPT-5-mini)
-    llm = get_llm()
 
+    llm = get_llm()
     agent = Agent(
         role=agent_cfg["role"],
         goal=agent_cfg["goal"],

@@ -2,6 +2,7 @@ import os
 import sys
 import re
 import yaml
+from openai import OpenAI
 import streamlit as st
 from crewai import Crew, Agent, Task
 from ai_hint_project.tools.rag_tool import build_rag_tool
@@ -22,43 +23,22 @@ import requests
 import streamlit as st
 import json
 
-# Retrieve the Hugging Face Access Token from Streamlit secrets
-HF_ACCESS_TOKEN = st.secrets["HUGGINGFACE_ACCESS_TOKEN"]
+# Retrieve the OpenAI API key from Streamlit secrets
+OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 
-# Hugging Face model endpoint (for GPT-2, you can change it to other models as needed)
-#HF_API_URL = "https://api-inference.huggingface.co/models/gpt2"  # You can use other models like gpt-j or distilGPT
-HF_API_URL="https://router.huggingface.co/hf-inference/models/gpt2"
+# Retrieve the OpenAI API key from Streamlit secrets
+OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+
 def get_llm():
-    # Prepare the headers with Authorization
-    headers = {
-        "Authorization": f"Bearer {HF_ACCESS_TOKEN}",
-        "Content-Type": "application/json"  # Ensure the content type is set to JSON
-    }
+    """Return a ChatOpenAI instance for CrewAI agents."""
+    return ChatOpenAI(
+        model="gpt-5-mini",
+        api_key=OPENAI_API_KEY,
+        temperature=0.7,
+        max_tokens=300
+    )
 
-    # Prepare the data (the prompt text to pass to the model)
-    data = {
-        "inputs": "Hello, Hugging Face! Can you help me?",  # Sample prompt for testing
-        "parameters": {
-            "max_length": 100  # Optional: Controls the maximum length of the output
-        }
-    }
 
-    try:
-        print("🔌 Sending request to Hugging Face API...")
-
-        # Send POST request to the Hugging Face API
-        response = requests.post(HF_API_URL, headers=headers, json=data)
-
-        # Check if the response is successful
-        if response.status_code == 200:
-            print("✅ Hugging Face LLM successfully loaded!")
-            return response.json()  # Return the generated response as JSON
-        else:
-            print(f"⚠️ Error: {response.status_code} - {response.text}")
-            return None  # Return None if error occurs
-    except Exception as e:
-        print(f"⚠️ Exception occurred: {e}")
-        return None  # Return None in case of an exception
 
 # Test the LLM call
 llm_response = get_llm()
@@ -126,7 +106,7 @@ def format_response(raw_text):
 
 
 # 🚀 Crew creation
-def create_crew(persona: str, user_question: str):
+def create_crew(persona: str, tutoring_context: str):
     print(f"✅ create_crew() called with persona: {persona}")
 
     base_dir = os.path.dirname(__file__)
@@ -137,9 +117,8 @@ def create_crew(persona: str, user_question: str):
     if not agent_cfg:
         raise ValueError(f"Unknown persona: {persona}")
 
-    # Get the LLM instance (now properly created)
+    # Get the LLM instance (ChatOpenAI with GPT-5-mini)
     llm = get_llm()
-    print("✅ LLM type:", type(llm))
 
     agent = Agent(
         role=agent_cfg["role"],
@@ -150,25 +129,17 @@ def create_crew(persona: str, user_question: str):
         llm=llm
     )
 
-    reaction = persona_reactions.get(persona, "No reaction available.")
-    task_description = f"{reaction}\n\n{user_question}"
-    if is_code_input(user_question):
-        task_description += "\n\nIf helpful, include code examples using triple backticks."
-
+    # Use tutoring context instead of just persona reaction
+    task_description = f"{tutoring_context}"
 
     # Get RAG context for the question
-    rag_context = rag_tool(user_question)
+    rag_context = rag_tool(tutoring_context)
 
     # Determine which task template to use
-    if is_chat():
-        task_type = "guided_learning"
-    else:
-        task_type = "explainer"
-
-    # Get the task template using task_type (not rag_context)
+    task_type = "guided_learning" if is_chat() else "explainer"
     task_template = tasks_config['tasks'][task_type]
 
-    # Create the task with RAG context included in the description
+    # Create the task with tutoring + RAG context
     task = Task(
         name=task_template['name'],
         description=task_template['description'].format(

@@ -399,3 +399,11 @@ class TutorAnalytics:
             return 'medium'
         else:
             return 'high'
+
+    def track_survey_results(self, survey_data):
+        """Track survey results"""
+        if not self.db:
+            return
+
+            db.collection("survey_responses").add(survey_data)
+            st.success("Thanks for your feedback! Your response has been recorded.")

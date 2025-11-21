@@ -8,6 +8,7 @@ from utils.storage import save_user_progress, save_rating
 from utils.data_collection import TutorAnalytics
 
 
+
 # -----------------------
 # State Management
 # -----------------------
@@ -314,3 +315,8 @@ def show_rating(selected_persona):
             analytics.track_click("Rate")
             st.success("Thanks for your feedback!")
             st.rerun()
+
+
+if st.button("Go to Survey"):
+    st.button("Go to Survey", on_click=lambda: st.switch_page("pages/Survey.py"))
+

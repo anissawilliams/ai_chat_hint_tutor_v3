@@ -37,7 +37,7 @@ with st.form("survey_form"):
 
 
 if submitted:
-    success = analytics.track_survey_results({
+    success = analytics.track_survey_response({
         "difficulty": difficulty,
         "clarity": clarity,
         "favorite_part": favorite_part,

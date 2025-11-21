@@ -403,7 +403,18 @@ class TutorAnalytics:
     def track_survey_results(self, survey_data):
         """Track survey results"""
         if not self.db:
-            return
+            st.error("Firestore not initialized")
+            return False
 
-            db.collection("survey_responses").add(survey_data)
+        try:
+            self.db.collection("survey_responses").add({
+                **survey_data,
+                "session_id": st.session_state.session_id,
+                "user_id": st.session_state.user_id,
+                "timestamp": datetime.now()
+            })
             st.success("Thanks for your feedback! Your response has been recorded.")
+            return True
+        except Exception as e:
+            st.error(f"Error writing survey results: {e}")
+            return False

@@ -37,12 +37,12 @@ with st.form("survey_form"):
 
 
 if submitted:
-        analytics.track_survey_response(survey_data)
-        st.success("Thanks for your feedback! Your response has been recorded.")
+    success = analytics.track_survey_results({
+        "difficulty": difficulty,
+        "clarity": clarity,
+        "favorite_part": favorite_part,
+        "suggestions": suggestions
+    })
+    if success:
         st.balloons()
-        st.success("Thanks for your feedback!")
 
-    # st.write("Difficulty:", difficulty)
-    # st.write("Clarity rating:", clarity)
-    # st.write("Favorite part:", favorite_part)
-    # st.write("Suggestions:", suggestions)

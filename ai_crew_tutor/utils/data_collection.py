@@ -190,50 +190,50 @@ class TutorAnalytics:
 
 # In utils/data_collection.py
 
-def send_ga_event(event_name, params=None):
-    """
-    Send event directly to Google via Python
-    Includes VISUAL DEBUGGING so you know it works.
-    """
-    ga_secrets = st.secrets.get("google_analytics", {})
-    measurement_id = ga_secrets.get("measurement_id")
-    api_secret = ga_secrets.get("api_secret")
+    def send_ga_event(event_name, params=None):
+        """
+        Send event directly to Google via Python
+        Includes VISUAL DEBUGGING so you know it works.
+        """
+        ga_secrets = st.secrets.get("google_analytics", {})
+        measurement_id = ga_secrets.get("measurement_id")
+        api_secret = ga_secrets.get("api_secret")
 
-    # Visual Debugger in Sidebar
-    if st.sidebar.checkbox("📡 Show Analytics Logs", value=True, key="debug_ga_toggle"):
-        st.sidebar.caption(f"📤 Sending: `{event_name}`")
+        # Visual Debugger in Sidebar
+        if st.sidebar.checkbox("📡 Show Analytics Logs", value=True, key="debug_ga_toggle"):
+            st.sidebar.caption(f"📤 Sending: `{event_name}`")
 
-    if not measurement_id or not api_secret:
-        if st.sidebar.session_state.get("debug_ga_toggle"):
-            st.sidebar.error("⚠️ Missing GA Secrets")
-        return
-
-    client_id = st.session_state.get('session_id', 'unknown')
-    url = f"https://www.google-analytics.com/mp/collect?measurement_id={measurement_id}&api_secret={api_secret}"
-
-    payload = {
-        "client_id": client_id,
-        "events": [{
-            "name": event_name,
-            "params": params or {}
-        }]
-    }
-
-    try:
-        # Use a short timeout so we don't freeze the app if Google is slow
-        resp = requests.post(url, json=payload, timeout=1)
-
-        # Check for success (204 means accepted)
-        if resp.status_code == 204:
+        if not measurement_id or not api_secret:
             if st.sidebar.session_state.get("debug_ga_toggle"):
-                st.sidebar.success(f"✅ GA Sent: {event_name}")
-        else:
-            if st.sidebar.session_state.get("debug_ga_toggle"):
-                st.sidebar.warning(f"⚠️ GA Status: {resp.status_code}")
+                st.sidebar.error("⚠️ Missing GA Secrets")
+            return
 
-    except Exception as e:
-        if st.sidebar.session_state.get("debug_ga_toggle"):
-            st.sidebar.error(f"❌ GA Failed: {e}")
+        client_id = st.session_state.get('session_id', 'unknown')
+        url = f"https://www.google-analytics.com/mp/collect?measurement_id={measurement_id}&api_secret={api_secret}"
+
+        payload = {
+            "client_id": client_id,
+            "events": [{
+                "name": event_name,
+                "params": params or {}
+            }]
+        }
+
+        try:
+            # Use a short timeout so we don't freeze the app if Google is slow
+            resp = requests.post(url, json=payload, timeout=1)
+
+            # Check for success (204 means accepted)
+            if resp.status_code == 204:
+                if st.sidebar.session_state.get("debug_ga_toggle"):
+                    st.sidebar.success(f"✅ GA Sent: {event_name}")
+            else:
+                if st.sidebar.session_state.get("debug_ga_toggle"):
+                    st.sidebar.warning(f"⚠️ GA Status: {resp.status_code}")
+
+        except Exception as e:
+            if st.sidebar.session_state.get("debug_ga_toggle"):
+                st.sidebar.error(f"❌ GA Failed: {e}")
 
 # ---------------------------------------------------------
 # FRONTEND INJECTION (Basic Page View Only)

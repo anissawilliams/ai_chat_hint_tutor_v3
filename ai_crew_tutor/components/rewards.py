@@ -1,31 +1,33 @@
 import streamlit as st
-from streamlit_modal import Modal
+import time
 
-def render_reward_popup(reward):
-    modal = Modal("🎁 Reward Unlocked!", key="reward_modal", max_width="600px")
-    modal.open()  # Always open if reward is set
 
-    if modal.is_open():
-        with modal.container():
-            if reward['type'] == 'level_up':
-                st.markdown(f"## 🎉 Level Up!\nYou're now Level {reward['level']}!\nKeep learning to unlock more tutors!")
-                st.button("Awesome!", on_click=lambda: close_reward())
+def render_reward_popup(reward_data):
+    """
+    Non-blocking reward notification using Toast + Balloons.
+    Safe for Streamlit Cloud.
+    """
+    if not reward_data:
+        return
 
-            elif reward['type'] == 'streak':
-                st.markdown(f"## 🔥 Streak Milestone!\n{reward['days']} Days Strong!\n+20 Bonus XP!")
-                st.button("Keep Going!", on_click=lambda: close_reward())
-
-            elif reward['type'] == 'affinity':
-                st.markdown(f"## ⭐ Affinity Upgrade!\n{reward['tier']} Tier with {reward['persona']}!\nNew code snippets unlocked!")
-                col1, col2 = st.columns([1, 1])
-                with col1:
-                    st.button("📚 Check Library!", on_click=lambda: check_library())
-                with col2:
-                    st.button("Continue", on_click=lambda: close_reward())
-
-def close_reward():
+    # Clear the state immediately so it doesn't loop forever
     st.session_state.show_reward = None
 
-def check_library():
-    st.session_state.show_reward = None
-    st.session_state.show_snippets = True
+    # 1. Level Up Event
+    if reward_data.get('type') == 'level_up':
+        level = reward_data.get('level')
+        st.toast(f"🎉 LEVEL UP! You are now Level {level}!", icon="🆙")
+        st.balloons()
+
+    # 2. Streak Event
+    elif reward_data.get('type') == 'streak':
+        days = reward_data.get('days')
+        st.toast(f"🔥 {days} Day Streak! Keep it up!", icon="🔥")
+        if days % 7 == 0:
+            st.snow()
+
+    # 3. Affinity Event
+    elif reward_data.get('type') == 'affinity':
+        persona = reward_data.get('persona')
+        tier = reward_data.get('tier')
+        st.toast(f"🌟 New Bond: You are now {tier} tier with {persona}!", icon="🤝")

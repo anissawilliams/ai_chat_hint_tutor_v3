@@ -14,10 +14,8 @@ def initialize_firebase():
     """Initialize Firebase connection"""
     if not firebase_admin._apps:
         try:
-            # Check if secrets exist
             if "firebase" not in st.secrets:
                 return None
-
             cred = credentials.Certificate({
                 "type": st.secrets["firebase"]["type"],
                 "project_id": st.secrets["firebase"]["project_id"],
@@ -27,10 +25,8 @@ def initialize_firebase():
             })
             firebase_admin.initialize_app(cred)
         except Exception as e:
-            # Fail silently on localhost if config is missing to avoid crash
             print(f"Firebase init skipped: {e}")
             return None
-
     return firestore.client()
 
 
@@ -40,20 +36,17 @@ def initialize_firebase():
 def send_ga_event(event_name, params=None):
     """
     Send event directly to Google via Python
-    Includes VISUAL DEBUGGING so you know it works.
     """
     ga_secrets = st.secrets.get("google_analytics", {})
     measurement_id = ga_secrets.get("measurement_id")
     api_secret = ga_secrets.get("api_secret")
 
-    # 1. Visual Debugger Checkbox
-    # The key="debug_ga_toggle" automatically stores True/False in st.session_state
-    st.sidebar.checkbox("📡 Show Analytics Logs", value=True, key="debug_ga_toggle")
-
-    # 2. Get the value safely from GLOBAL session state
+    # FIX: We DO NOT create the checkbox here anymore (prevents DuplicateKey error).
+    # We just read the state. If the key doesn't exist, we default to True (Show logs).
     show_logs = st.session_state.get("debug_ga_toggle", True)
 
     if show_logs:
+        # We use st.sidebar.write or caption, which IS allowed multiple times
         st.sidebar.caption(f"📤 Sending: `{event_name}`")
 
     if not measurement_id or not api_secret:
@@ -73,17 +66,13 @@ def send_ga_event(event_name, params=None):
     }
 
     try:
-        # Use a short timeout so we don't freeze the app if Google is slow
         resp = requests.post(url, json=payload, timeout=1)
-
-        # Check for success (204 means accepted)
         if resp.status_code == 204:
             if show_logs:
                 st.sidebar.success(f"✅ GA Sent: {event_name}")
         else:
             if show_logs:
                 st.sidebar.warning(f"⚠️ GA Status: {resp.status_code}")
-
     except Exception as e:
         if show_logs:
             st.sidebar.error(f"❌ GA Failed: {e}")
@@ -104,6 +93,7 @@ class TutorAnalytics:
             st.session_state.clicks_tracked = []
             st.session_state.current_persona = None
 
+            # This is safe to call now
             self._log_session_start()
 
     def _generate_user_id(self):
@@ -187,11 +177,9 @@ class TutorAnalytics:
         })
 
     def track_survey_results(self, survey_data):
-        """Track survey results"""
         if not self.db:
             st.error("Firestore not initialized")
             return False
-
         try:
             self.db.collection("survey_responses").add({
                 **survey_data,
@@ -199,28 +187,23 @@ class TutorAnalytics:
                 "user_id": st.session_state.user_id,
                 "timestamp": datetime.now()
             })
-            st.success("Thanks for your feedback! Your response has been recorded.")
+            st.success("Thanks for your feedback!")
             return True
         except Exception as e:
             st.error(f"Error writing survey results: {e}")
             return False
 
     def get_session_duration(self):
-        """Returns session duration in minutes"""
         delta = datetime.now() - st.session_state.session_start
         return delta.total_seconds() / 60
 
 
 # ---------------------------------------------------------
-# FRONTEND INJECTION (Basic Page View Only)
+# FRONTEND INJECTION
 # ---------------------------------------------------------
 def inject_google_analytics():
-    """
-    Injects GA config only (Events handled by Python)
-    """
     ga_id = st.secrets.get("google_analytics", {}).get("measurement_id")
     if not ga_id: return
-
     ga_code = f"""
     <script async src="https://www.googletagmanager.com/gtag/js?id={ga_id}"></script>
     <script>

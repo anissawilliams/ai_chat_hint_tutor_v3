@@ -197,6 +197,55 @@ class TutorAnalytics:
         delta = datetime.now() - st.session_state.session_start
         return delta.total_seconds() / 60
 
+    # Add this inside class TutorAnalytics in utils/data_collection.py
+
+    def track_learning_outcome(self, code_input, is_correct, attempt_number, persona_name):
+        """
+        Track student performance on code challenges.
+
+        Args:
+            code_input (str): The code the student wrote.
+            is_correct (bool): Did they get it right?
+            attempt_number (int): How many tries did this take?
+            persona_name (str): Which tutor were they using?
+        """
+        if not self.db:
+            return
+
+        # Calculate time since last interaction (Time to Answer)
+        now = datetime.now()
+        last_interaction = st.session_state.get('last_interaction_time', st.session_state.session_start)
+        seconds_taken = (now - last_interaction).total_seconds()
+
+        # Update last interaction time for the next cycle
+        st.session_state.last_interaction_time = now
+
+        # 1. Firebase (Detailed for your dashboard)
+        outcome_data = {
+            'session_id': st.session_state.session_id,
+            'timestamp': now,
+            'persona': persona_name,
+            'is_correct': is_correct,
+            'attempt_number': attempt_number,
+            'seconds_taken': seconds_taken,
+            'code_length': len(code_input),
+            # Optional: Store the actual code to analyze common mistakes later
+             'student_code': code_input
+        }
+
+        try:
+            self.db.collection('learning_outcomes').add(outcome_data)
+        except:
+            pass
+
+        # 2. Google Analytics (Aggregated for trends)
+        send_ga_event('code_submission', {
+            'result': 'success' if is_correct else 'failure',
+            'persona': persona_name,
+            'attempt': attempt_number,
+            'time_spent_seconds': int(seconds_taken)
+        })
+
 
 # ---------------------------------------------------------
 # FRONTEND INJECTION

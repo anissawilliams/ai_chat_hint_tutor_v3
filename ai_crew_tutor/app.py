@@ -56,6 +56,11 @@ analytics = TutorAnalytics()
 if 'user_progress' not in st.session_state:
     st.session_state.user_progress = load_user_progress()
 
+if 'last_interaction_time' not in st.session_state:
+    st.session_state.last_interaction_time = datetime.now()
+
+if 'attempt_counter' not in st.session_state:
+    st.session_state.attempt_counter = 0
 # Initialize other state vars
 defaults = {
     'current_persona': None,

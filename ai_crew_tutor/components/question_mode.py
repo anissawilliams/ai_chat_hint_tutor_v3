@@ -296,18 +296,18 @@ def show_rating(selected_persona):
     """Rating system"""
     analytics = TutorAnalytics()
 
-    if st.session_state.get('show_rating', False):
-        st.markdown("#### How helpful was this session?")
-
-        rating = st.slider(
-            "Rate the session",
-            min_value=1,
-            max_value=5,
-            value=3,
-            step=1,
-            format="%d ⭐",
-            key="rating_slider"
-        )
+    # if st.session_state.get('show_rating', False):
+    #     st.markdown("#### How helpful was this session?")
+    #
+    #     rating = st.slider(
+    #         "Rate the session",
+    #         min_value=1,
+    #         max_value=5,
+    #         value=3,
+    #         step=1,
+    #         format="%d ⭐",
+    #         key="rating_slider"
+    #     )
 
         # if st.button("Submit Rating", type="primary"):
         #     #save_rating(selected_persona, rating)

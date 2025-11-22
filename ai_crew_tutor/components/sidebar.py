@@ -29,7 +29,7 @@ def render_sidebar(user_level, user_xp, user_streak, persona_avatars, historical
         st.divider()
 
 
-    
+
         # =================
         # Unlock Progress
         # =================
@@ -44,7 +44,21 @@ def render_sidebar(user_level, user_xp, user_streak, persona_avatars, historical
             st.success("🎉 All tutors unlocked!")
 
         st.divider()
+        # Add this inside render_sidebar or temporary in app.py
+        with st.sidebar.expander("🔧 Gamification Debugger"):
+            st.write(f"Current XP: {st.session_state.user_progress['xp']}")
+            st.write(f"Current Level: {st.session_state.user_progress['level']}")
 
+            if st.button("➕ Force Add 500 XP"):
+                # Import locally to ensure we have access
+                from utils.gamification import add_xp
+                from utils.storage import save_user_progress
+
+                # Force add XP
+                add_xp(st.session_state.user_progress, 500, st.session_state)
+                save_user_progress(st.session_state.user_progress)
+                st.success("Added 500 XP! Refreshing...")
+                st.rerun()
         # =================
         # Quick stats from history
         # =================

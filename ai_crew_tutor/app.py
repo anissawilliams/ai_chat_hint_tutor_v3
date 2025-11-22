@@ -173,4 +173,5 @@ if st.session_state.current_persona:
 
 # --- FOOTER ---
 st.divider()
+st.checkbox("📡 Show Analytics Logs", value=True, key="debug_ga_toggle")
 st.caption(f"Level {progress['level']} • {progress['streak']} Day Streak 🔥")

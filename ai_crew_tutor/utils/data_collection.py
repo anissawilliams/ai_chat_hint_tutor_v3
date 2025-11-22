@@ -39,14 +39,26 @@ def initialize_firebase():
 # ---------------------------------------------------------
 def send_ga_event(event_name, params=None):
     """
-    Send event directly to Google via Python (Bypasses Iframe issues)
+    Send event directly to Google via Python
+    Includes VISUAL DEBUGGING so you know it works.
     """
     ga_secrets = st.secrets.get("google_analytics", {})
     measurement_id = ga_secrets.get("measurement_id")
     api_secret = ga_secrets.get("api_secret")
 
+    # 1. Visual Debugger Checkbox
+    # The key="debug_ga_toggle" automatically stores True/False in st.session_state
+    st.sidebar.checkbox("📡 Show Analytics Logs", value=True, key="debug_ga_toggle")
+
+    # 2. Get the value safely from GLOBAL session state
+    show_logs = st.session_state.get("debug_ga_toggle", True)
+
+    if show_logs:
+        st.sidebar.caption(f"📤 Sending: `{event_name}`")
+
     if not measurement_id or not api_secret:
-        # If secrets are missing, skip GA but don't crash
+        if show_logs:
+            st.sidebar.error("⚠️ Missing GA Secrets")
         return
 
     client_id = st.session_state.get('session_id', str(uuid.uuid4()))
@@ -61,9 +73,20 @@ def send_ga_event(event_name, params=None):
     }
 
     try:
-        requests.post(url, json=payload, timeout=1)
+        # Use a short timeout so we don't freeze the app if Google is slow
+        resp = requests.post(url, json=payload, timeout=1)
+
+        # Check for success (204 means accepted)
+        if resp.status_code == 204:
+            if show_logs:
+                st.sidebar.success(f"✅ GA Sent: {event_name}")
+        else:
+            if show_logs:
+                st.sidebar.warning(f"⚠️ GA Status: {resp.status_code}")
+
     except Exception as e:
-        print(f"GA Send Error: {e}")
+        if show_logs:
+            st.sidebar.error(f"❌ GA Failed: {e}")
 
 
 # ---------------------------------------------------------
@@ -164,7 +187,7 @@ class TutorAnalytics:
         })
 
     def track_survey_results(self, survey_data):
-        """Track survey results (Restored)"""
+        """Track survey results"""
         if not self.db:
             st.error("Firestore not initialized")
             return False
@@ -187,60 +210,6 @@ class TutorAnalytics:
         delta = datetime.now() - st.session_state.session_start
         return delta.total_seconds() / 60
 
-
-# In utils/data_collection.py
-
-    def send_ga_event(event_name, params=None):
-        """
-        Send event directly to Google via Python
-        Includes VISUAL DEBUGGING so you know it works.
-        """
-        ga_secrets = st.secrets.get("google_analytics", {})
-        measurement_id = ga_secrets.get("measurement_id")
-        api_secret = ga_secrets.get("api_secret")
-
-        # 1. Visual Debugger Checkbox
-        # This creates a checkbox in the sidebar.
-        # The key="debug_ga_toggle" saves the True/False value into st.session_state
-        st.sidebar.checkbox("📡 Show Analytics Logs", value=True, key="debug_ga_toggle")
-
-        # 2. Get the value safely from GLOBAL session state
-        show_logs = st.session_state.get("debug_ga_toggle", True)
-
-        if show_logs:
-            st.sidebar.caption(f"📤 Sending: `{event_name}`")
-
-        if not measurement_id or not api_secret:
-            if show_logs:
-                st.sidebar.error("⚠️ Missing GA Secrets")
-            return
-
-        client_id = st.session_state.get('session_id', str(uuid.uuid4()))
-        url = f"https://www.google-analytics.com/mp/collect?measurement_id={measurement_id}&api_secret={api_secret}"
-
-        payload = {
-            "client_id": client_id,
-            "events": [{
-                "name": event_name,
-                "params": params or {}
-            }]
-        }
-
-        try:
-            # Use a short timeout so we don't freeze the app if Google is slow
-            resp = requests.post(url, json=payload, timeout=1)
-
-            # Check for success (204 means accepted)
-            if resp.status_code == 204:
-                if show_logs:
-                    st.sidebar.success(f"✅ GA Sent: {event_name}")
-            else:
-                if show_logs:
-                    st.sidebar.warning(f"⚠️ GA Status: {resp.status_code}")
-
-        except Exception as e:
-            if show_logs:
-                st.sidebar.error(f"❌ GA Failed: {e}")
 
 # ---------------------------------------------------------
 # FRONTEND INJECTION (Basic Page View Only)

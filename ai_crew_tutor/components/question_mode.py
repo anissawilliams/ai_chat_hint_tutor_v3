@@ -3,10 +3,10 @@ Question Mode Component - Simplified Conversational Tutor
 """
 import re
 import streamlit as st
+from datetime import datetime
 from utils.gamification import add_xp
 from utils.storage import save_user_progress, save_rating
 from utils.data_collection import TutorAnalytics
-
 
 
 # -----------------------
@@ -20,6 +20,12 @@ def _ensure_step_state():
         st.session_state.user_progress = {'level': 1, 'xp': 0, 'affinity': {}}
     if 'show_rating' not in st.session_state:
         st.session_state.show_rating = False
+
+    # New state for tracking learning metrics
+    if 'attempt_counter' not in st.session_state:
+        st.session_state.attempt_counter = 0
+    if 'last_interaction_time' not in st.session_state:
+        st.session_state.last_interaction_time = datetime.now()
 
 
 # -----------------------
@@ -228,6 +234,9 @@ def render_chat_interface(selected_persona, persona_avatars, create_crew, user_l
     user_input = st.chat_input("Ask a question or paste your code...")
 
     if user_input:
+        # 1. Increment Attempt Counter (User just did something)
+        st.session_state.attempt_counter += 1
+
         # Add user message
         st.session_state.chat_history.append({
             "role": "user",
@@ -243,10 +252,23 @@ def render_chat_interface(selected_persona, persona_avatars, create_crew, user_l
         if looks_like_code(user_input):
             # Get conversation context for smart validation
             full_conversation = "\n".join([msg['content'] for msg in st.session_state.chat_history])
+
+            # Validate
             is_valid, feedback, should_celebrate = smart_validate_java_code(user_input, full_conversation)
 
+            # --- TRACK LEARNING OUTCOME ---
+            analytics.track_learning_outcome(
+                code_input=user_input,
+                is_correct=should_celebrate,
+                attempt_number=st.session_state.attempt_counter,
+                persona_name=selected_persona
+            )
+            # ------------------------------
+
             if should_celebrate:
-                # Success!
+                # Reset counter on success
+                st.session_state.attempt_counter = 0
+
                 handle_success(persona_avatars, selected_persona)
                 st.rerun()
                 return
@@ -270,6 +292,7 @@ def render_chat_interface(selected_persona, persona_avatars, create_crew, user_l
                     "content": response,
                     "avatar": persona_avatars.get(selected_persona, "🤖")
                 })
+                # Track the standard question analytics
                 analytics.track_question(question=user_input, response=response, persona=selected_persona)
 
         st.rerun()
@@ -295,28 +318,9 @@ def render_question_mode(selected_persona, persona_avatars, create_crew, user_le
 def show_rating(selected_persona):
     """Rating system"""
     analytics = TutorAnalytics()
-
-    # if st.session_state.get('show_rating', False):
-    #     st.markdown("#### How helpful was this session?")
-    #
-    #     rating = st.slider(
-    #         "Rate the session",
-    #         min_value=1,
-    #         max_value=5,
-    #         value=3,
-    #         step=1,
-    #         format="%d ⭐",
-    #         key="rating_slider"
-    #     )
-
-        # if st.button("Submit Rating", type="primary"):
-        #     #save_rating(selected_persona, rating)
-        #     st.session_state.show_rating = False
-        #     analytics.track_click("Rate")
-        #     st.success("Thanks for your feedback!")
-        #     st.rerun()
+    # (Commented out as requested, relying on Survey page)
 
 
+# Fixed Button Logic
 if st.button("Go to Survey"):
-    st.button("Go to Survey", on_click=lambda: st.switch_page("pages/Survey.py"))
-
+    st.switch_page("pages/Survey.py")

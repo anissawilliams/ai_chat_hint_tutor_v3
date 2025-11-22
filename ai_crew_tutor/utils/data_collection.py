@@ -199,16 +199,23 @@ class TutorAnalytics:
         measurement_id = ga_secrets.get("measurement_id")
         api_secret = ga_secrets.get("api_secret")
 
-        # Visual Debugger in Sidebar
-        if st.sidebar.checkbox("📡 Show Analytics Logs", value=True, key="debug_ga_toggle"):
+        # 1. Visual Debugger Checkbox
+        # This creates a checkbox in the sidebar.
+        # The key="debug_ga_toggle" saves the True/False value into st.session_state
+        st.sidebar.checkbox("📡 Show Analytics Logs", value=True, key="debug_ga_toggle")
+
+        # 2. Get the value safely from GLOBAL session state
+        show_logs = st.session_state.get("debug_ga_toggle", True)
+
+        if show_logs:
             st.sidebar.caption(f"📤 Sending: `{event_name}`")
 
         if not measurement_id or not api_secret:
-            if st.sidebar.session_state.get("debug_ga_toggle"):
+            if show_logs:
                 st.sidebar.error("⚠️ Missing GA Secrets")
             return
 
-        client_id = st.session_state.get('session_id', 'unknown')
+        client_id = st.session_state.get('session_id', str(uuid.uuid4()))
         url = f"https://www.google-analytics.com/mp/collect?measurement_id={measurement_id}&api_secret={api_secret}"
 
         payload = {
@@ -225,14 +232,14 @@ class TutorAnalytics:
 
             # Check for success (204 means accepted)
             if resp.status_code == 204:
-                if st.sidebar.session_state.get("debug_ga_toggle"):
+                if show_logs:
                     st.sidebar.success(f"✅ GA Sent: {event_name}")
             else:
-                if st.sidebar.session_state.get("debug_ga_toggle"):
+                if show_logs:
                     st.sidebar.warning(f"⚠️ GA Status: {resp.status_code}")
 
         except Exception as e:
-            if st.sidebar.session_state.get("debug_ga_toggle"):
+            if show_logs:
                 st.sidebar.error(f"❌ GA Failed: {e}")
 
 # ---------------------------------------------------------

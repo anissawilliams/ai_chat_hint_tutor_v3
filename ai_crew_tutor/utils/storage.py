@@ -1,63 +1,61 @@
-"""
-Storage utilities for user progress and ratings
-"""
+import streamlit as st
 import json
 import os
-import pandas as pd
-from datetime import datetime
+from firebase_admin import firestore
 
-def get_base_dir():
-    """Get the base directory of the application"""
-    return os.path.dirname(os.path.dirname(__file__))
+# Default starter profile
+DEFAULT_PROGRESS = {
+    "level": 1,
+    "xp": 0,
+    "streak": 0,
+    "last_visit": None,
+    "affinity": {}
+}
+
+def get_db():
+    """Helper to get Firestore client"""
+    try:
+        return firestore.client()
+    except:
+        return None
 
 def load_user_progress():
-    """Load user progress from JSON file"""
-    filepath = os.path.join(get_base_dir(), "user_progress.json")
-    if os.path.exists(filepath):
-        try:
-            with open(filepath, "r") as f:
-                return json.load(f)
-        except Exception as e:
-            print(f"Error loading progress: {e}")
-    return {
-        'level': 1,
-        'xp': 0,
-        'streak': 0,
-        'last_visit': None,
-        'affinity': {}
-    }
+    """Load from Firebase (Robust) instead of JSON"""
+    db = get_db()
+    
+    # If no DB or no user_id, return default
+    if not db or 'user_id' not in st.session_state:
+        return DEFAULT_PROGRESS.copy()
 
-def save_user_progress(data):
-    """Save user progress to JSON file"""
-    filepath = os.path.join(get_base_dir(), "user_progress.json")
+    user_id = st.session_state.user_id
+    doc_ref = db.collection('users').document(user_id)
+    doc = doc_ref.get()
+
+    if doc.exists:
+        return doc.to_dict()
+    else:
+        # Create new user if they don't exist
+        doc_ref.set(DEFAULT_PROGRESS)
+        return DEFAULT_PROGRESS.copy()
+
+def save_user_progress(progress_data):
+    """Save to Firebase"""
+    db = get_db()
+    if not db or 'user_id' not in st.session_state:
+        return
+
     try:
-        with open(filepath, "w") as f:
-            json.dump(data, f, indent=2)
-        return True
+        user_id = st.session_state.user_id
+        db.collection('users').document(user_id).set(progress_data, merge=True)
     except Exception as e:
-        print(f"Error saving progress: {e}")
-        return False
+        print(f"Save Error: {e}")
 
-def load_ratings():
-    """Load historical ratings from JSON lines file"""
-    filepath = os.path.join(get_base_dir(), "ratings.json")
-    if os.path.exists(filepath):
-        try:
-            with open(filepath, "r") as f:
-                data = [json.loads(line) for line in f if line.strip()]
-                if data:
-                    return pd.DataFrame(data)
-        except Exception as e:
-            print(f"Error loading ratings: {e}")
-    return pd.DataFrame()
-
-def save_rating(rating_data):
-    """Append a rating to the ratings file"""
-    filepath = os.path.join(get_base_dir(), "ratings.json")
-    try:
-        with open(filepath, "a") as f:
-            f.write(json.dumps(rating_data) + "\n")
-        return True
-    except Exception as e:
-        print(f"Error saving rating: {e}")
-        return False
+def save_rating(persona, rating):
+    """Save rating to Firebase"""
+    db = get_db()
+    if db:
+        db.collection('ratings').add({
+            "persona": persona,
+            "rating": rating,
+            "timestamp": firestore.SERVER_TIMESTAMP
+        })

@@ -3,8 +3,9 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 from datetime import datetime
 import uuid
-import requests  # <--- Added for server-side Analytics
+import requests  # Required for server-side GA tracking
 import streamlit.components.v1 as components
+
 
 # ---------------------------------------------------------
 # FIREBASE SETUP
@@ -16,7 +17,7 @@ def initialize_firebase():
             # Check if secrets exist
             if "firebase" not in st.secrets:
                 return None
-                
+
             cred = credentials.Certificate({
                 "type": st.secrets["firebase"]["type"],
                 "project_id": st.secrets["firebase"]["project_id"],
@@ -26,14 +27,15 @@ def initialize_firebase():
             })
             firebase_admin.initialize_app(cred)
         except Exception as e:
-            # Fail silently on localhost if config is missing, to avoid crashing app
+            # Fail silently on localhost if config is missing to avoid crash
             print(f"Firebase init skipped: {e}")
             return None
 
     return firestore.client()
 
+
 # ---------------------------------------------------------
-# GOOGLE ANALYTICS SETUP (SERVER-SIDE)
+# GOOGLE ANALYTICS (SERVER-SIDE)
 # ---------------------------------------------------------
 def send_ga_event(event_name, params=None):
     """
@@ -44,12 +46,10 @@ def send_ga_event(event_name, params=None):
     api_secret = ga_secrets.get("api_secret")
 
     if not measurement_id or not api_secret:
-        print("⚠️ GA Credentials missing. Event not sent.")
+        # If secrets are missing, skip GA but don't crash
         return
 
-    # Use the session_id as the client_id so events are linked to one user
     client_id = st.session_state.get('session_id', str(uuid.uuid4()))
-
     url = f"https://www.google-analytics.com/mp/collect?measurement_id={measurement_id}&api_secret={api_secret}"
 
     payload = {
@@ -60,11 +60,11 @@ def send_ga_event(event_name, params=None):
         }]
     }
 
-    # Send async (don't await response to keep UI fast)
     try:
         requests.post(url, json=payload, timeout=1)
     except Exception as e:
         print(f"GA Send Error: {e}")
+
 
 # ---------------------------------------------------------
 # MAIN ANALYTICS CLASS
@@ -80,8 +80,7 @@ class TutorAnalytics:
             st.session_state.interaction_count = 0
             st.session_state.clicks_tracked = []
             st.session_state.current_persona = None
-            
-            # Log start
+
             self._log_session_start()
 
     def _generate_user_id(self):
@@ -102,12 +101,12 @@ class TutorAnalytics:
             except Exception as e:
                 print(f"Firebase Error: {e}")
 
-        # 2. Google Analytics (Python Side)
+        # 2. Google Analytics
         send_ga_event('session_start', {'session_id': st.session_state.session_id})
 
     def track_persona_selection(self, persona_name):
         st.session_state.current_persona = persona_name
-        
+
         # Firebase
         if self.db:
             try:
@@ -115,9 +114,10 @@ class TutorAnalytics:
                     'persona': persona_name,
                     'persona_selected_at': datetime.now()
                 })
-            except: pass
+            except:
+                pass
 
-        # Google Analytics
+        # GA
         send_ga_event('select_persona', {'persona_name': persona_name})
 
     def track_question(self, question, response, persona=None):
@@ -135,12 +135,13 @@ class TutorAnalytics:
                     'persona': p
                 }
                 self.db.collection('interactions').add(interaction_data)
-            except: pass
+            except:
+                pass
 
-        # Google Analytics
+        # GA
         send_ga_event('ask_question', {
             'persona': p,
-            'question_length': len(question), # GA4 prefers numbers/strings over buckets usually
+            'question_length': len(question),
             'interaction_count': st.session_state.interaction_count
         })
 
@@ -153,31 +154,50 @@ class TutorAnalytics:
                     'element': element_name,
                     'timestamp': datetime.now()
                 })
-            except: pass
-            
-        # Google Analytics
+            except:
+                pass
+
+        # GA
         send_ga_event('click', {
             'element_name': element_name,
             'element_type': element_type
         })
-        
+
+    def track_survey_results(self, survey_data):
+        """Track survey results (Restored)"""
+        if not self.db:
+            st.error("Firestore not initialized")
+            return False
+
+        try:
+            self.db.collection("survey_responses").add({
+                **survey_data,
+                "session_id": st.session_state.session_id,
+                "user_id": st.session_state.user_id,
+                "timestamp": datetime.now()
+            })
+            st.success("Thanks for your feedback! Your response has been recorded.")
+            return True
+        except Exception as e:
+            st.error(f"Error writing survey results: {e}")
+            return False
+
     def get_session_duration(self):
         """Returns session duration in minutes"""
         delta = datetime.now() - st.session_state.session_start
         return delta.total_seconds() / 60
 
+
 # ---------------------------------------------------------
-# FRONTEND INJECTION (Optional - For Basic Page Views)
+# FRONTEND INJECTION (Basic Page View Only)
 # ---------------------------------------------------------
 def inject_google_analytics():
     """
-    Only used for basic Page View tracking via browser.
-    Events are now handled by Python above.
+    Injects GA config only (Events handled by Python)
     """
     ga_id = st.secrets.get("google_analytics", {}).get("measurement_id")
     if not ga_id: return
 
-    # We only inject the CONFIG, we do not try to send events here anymore
     ga_code = f"""
     <script async src="https://www.googletagmanager.com/gtag/js?id={ga_id}"></script>
     <script>

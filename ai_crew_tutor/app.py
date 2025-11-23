@@ -142,15 +142,6 @@ render_sidebar(
     historical_df
 )
 
-# --- GAMIFICATION DEBUGGER (Temporary - Remove later) ---
-with st.sidebar.expander("🔧 Gamification Debugger"):
-    st.write(f"XP: {st.session_state.user_progress['xp']}")
-    st.write(f"Level: {st.session_state.user_progress['level']}")
-    if st.button("➕ Force 500 XP"):
-        from utils.gamification import add_xp
-        # This will trigger the Toast + Balloons
-        add_xp(st.session_state.user_progress, 500, st.session_state)
-        st.rerun()
 
 # --- MAIN HEADER ---
 progress = st.session_state.user_progress
@@ -185,5 +176,5 @@ if st.session_state.current_persona:
 
 # --- FOOTER ---
 st.divider()
-st.checkbox("📡 Show Analytics Logs", value=True, key="debug_ga_toggle")
+#st.checkbox("📡 Show Analytics Logs", value=True, key="debug_ga_toggle")
 st.caption(f"Level {progress['level']} • {progress['streak']} Day Streak 🔥")

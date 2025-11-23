@@ -159,6 +159,8 @@ def build_tutor_context(chat_history, persona):
         - Check understanding: ask them to explain their reasoning
         - End with: "👉 [one specific question]?"
         - Respond ONLY as {persona}
+        - If they're stuck, ask a simpler leading question
+        - If they're right, show the answer in code blocks
 
         Conversation history:
         """

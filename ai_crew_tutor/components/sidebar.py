@@ -1,56 +1,60 @@
 """
-Sidebar component with stats and navigation (Streamlit pages compatible)
+Sidebar component with stats, learning settings, and badge tracking.
 """
 import streamlit as st
-from utils.personas import PERSONA_UNLOCK_LEVELS, get_next_unlock
 from utils.storage import save_user_progress
-# ✅ NEW: Import Analytics
 from utils.data_collection import TutorAnalytics
-
-def navigate_to(page_name: str):
-    """Set query params to navigate to a page"""
-    st.experimental_set_query_params(page=page_name)
+from utils.gamification import get_affinity_tier
 
 def render_sidebar(user_level, user_xp, user_streak, persona_avatars, historical_df):
-    """Render the sidebar with stats, controls, and page navigation"""
-
-    # ✅ Initialize Analytics
+    """
+    Render the sidebar with User Profile, Stats, Learning Settings, and Badges.
+    """
+    # Initialize Analytics
     analytics = TutorAnalytics()
 
     with st.sidebar:
-        st.title("⚙️ Control Center")
+        # ---------------------------------------------------------
+        # 1. USER PROFILE HEADER
+        # ---------------------------------------------------------
+        username = st.session_state.get('username', 'Student')
 
-        # =================
-        # 1. User Stats
-        # =================
-        st.header("📊 Your Stats")
+        st.markdown(f"""
+        <div style="text-align: center; margin-bottom: 20px;">
+            <div style="font-size: 3rem;">🎓</div>
+            <h3>{username}</h3>
+            <div style="background-color: #262730; padding: 5px 10px; border-radius: 15px; display: inline-block;">
+                <small>Level {user_level}</small>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # ---------------------------------------------------------
+        # 2. GAMIFICATION STATS
+        # ---------------------------------------------------------
         col1, col2 = st.columns(2)
         with col1:
-            st.metric("Level", user_level)
-            st.metric("Streak", f"{user_streak} 🔥")
+            st.metric("🔥 Streak", f"{user_streak} Days")
         with col2:
-            st.metric("XP", user_xp)
-            # Calculate unlocked count safely
-            unlocked_count = sum(1 for p in PERSONA_UNLOCK_LEVELS if PERSONA_UNLOCK_LEVELS[p] <= user_level)
-            st.metric("Tutors", f"{unlocked_count}/{len(PERSONA_UNLOCK_LEVELS)}")
+            st.metric("✨ XP", user_xp)
+
+        # Tutors Count (Always Full since we unlocked everyone)
+        total_tutors = len(persona_avatars)
+        st.caption(f"Tutors Available: {total_tutors}/{total_tutors}")
 
         st.divider()
 
-        # ... inside render_sidebar ...
-
-        # =================
-        # 2. Learning Settings (Sleek Version)
-        # =================
-        st.subheader("⚙️ Learning Settings")
+        # ---------------------------------------------------------
+        # 3. ⚙️ LEARNING SETTINGS (Sleek Selector)
+        # ---------------------------------------------------------
+        st.subheader("⚙️ Learning Mode")
 
         if 'user_progress' not in st.session_state:
-            st.session_state.user_progress = {}
+             st.session_state.user_progress = {}
 
         current_proficiency = st.session_state.user_progress.get('proficiency', 'Beginner')
 
-        # OPTIONS:
-        # 1. st.pills is the modern "Chip" look (Streamlit 1.40+)
-        # 2. If that fails, use st.radio(..., horizontal=True)
+        # Try to use st.pills (Streamlit 1.40+), fallback to radio
         try:
             selected_proficiency = st.pills(
                 "Teaching Style",
@@ -60,55 +64,84 @@ def render_sidebar(user_level, user_xp, user_streak, persona_avatars, historical
                 key="prof_selector"
             )
         except AttributeError:
-            # Fallback for older Streamlit versions
+            # Fallback for older versions
             selected_proficiency = st.radio(
                 "Teaching Style",
                 options=["Beginner", "Intermediate", "Advanced"],
                 index=["Beginner", "Intermediate", "Advanced"].index(current_proficiency),
-                horizontal=True,  # <--- This fixes the "funky" vertical look
+                horizontal=True,
                 key="prof_selector"
             )
 
         # Logic: Save & Track if changed
-        # Note: st.pills returns None if deselected, so we handle that
+        # Note: st.pills returns None if deselected, so we check availability
         if selected_proficiency and selected_proficiency != current_proficiency:
+            # 1. Update State
             st.session_state.user_progress['proficiency'] = selected_proficiency
+
+            # 2. Save to Firebase
             save_user_progress(st.session_state.user_progress)
+
+            # 3. Track Event
             analytics.track_click(f"Changed Proficiency to {selected_proficiency}", "settings_change")
+
+            # 4. Refresh
             st.rerun()
 
-        # Helper text to explain the mode
-        mode_explanations = {
-            "Beginner": "🌱 Step-by-step guidance. More hints.",
-            "Intermediate": "🛠️ Logic focus. Socratic questioning.",
-            "Advanced": "🚀 Code reviews. Efficiency focus."
-        }
-        st.caption(mode_explanations.get(selected_proficiency, ""))
+        # Mode Explanation
+        mode_icons = {"Beginner": "🌱", "Intermediate": "🛠️", "Advanced": "🚀"}
+        st.caption(f"{mode_icons.get(current_proficiency, '')} {current_proficiency} Mode active")
 
         st.divider()
 
-        # =================
-        # 3. Unlock Progress
-        # =================
-        st.header("🔓 Unlock Progress")
-        next_persona, next_level = get_next_unlock(user_level)
+        # ---------------------------------------------------------
+        # 4. 🏆 BADGES (Replaces Unlock Progress)
+        # ---------------------------------------------------------
+        st.subheader("🏆 Your Badges")
 
-        if next_persona:
-            levels_needed = next_level - user_level
-            st.info(f"**Next unlock:** {persona_avatars.get(next_persona, '🧠')} {next_persona}")
-            st.caption(f"Reach level {next_level} ({levels_needed} levels to go!)")
-        else:
-            st.success("🎉 All tutors unlocked!")
+        # Calculate Medal Counts based on Affinity
+        affinity_map = st.session_state.user_progress.get('affinity', {})
+        medals = {'Gold': 0, 'Silver': 0, 'Bronze': 0}
+
+        for _, points in affinity_map.items():
+            tier, _ = get_affinity_tier(points)
+            if tier in medals:
+                medals[tier] += 1
+
+        b_col1, b_col2, b_col3 = st.columns(3)
+        b_col1.metric("🥇", medals['Gold'], help="Gold Badges (75+ Affinity)")
+        b_col2.metric("🥈", medals['Silver'], help="Silver Badges (50+ Affinity)")
+        b_col3.metric("🥉", medals['Bronze'], help="Bronze Badges (25+ Affinity)")
 
         st.divider()
 
-        # =================
-        # 4. History Stats
-        # =================
-        if not historical_df.empty:
-            st.header("📈 All-Time Stats")
-            # Safe check if 'clarity' exists in your historical data
-            if 'clarity' in historical_df.columns:
-                avg_rating = historical_df['clarity'].mean()
-                st.metric("Avg Clarity", f"{avg_rating:.1f}⭐")
-            st.metric("Total Questions", len(historical_df))
+        # ---------------------------------------------------------
+        # 5. RECENT HISTORY
+        # ---------------------------------------------------------
+        if historical_df is not None and not historical_df.empty:
+            st.subheader("📜 Recent History")
+
+            # Calculate Avg Clarity safely
+            if 'rating' in historical_df.columns:
+                # Ensure numeric
+                numeric_ratings = pd.to_numeric(historical_df['rating'], errors='coerce')
+                avg_rating = numeric_ratings.mean()
+                if not pd.isna(avg_rating):
+                    st.metric("Avg Session Rating", f"{avg_rating:.1f}⭐")
+
+            st.caption(f"Total Interactions: {len(historical_df)}")
+
+            # Show last 3 sessions
+            recent = historical_df.tail(3).iloc[::-1]
+            for _, row in recent.iterrows():
+                persona = row.get('persona', 'Unknown')
+                avatar = persona_avatars.get(persona, '🤖')
+                st.markdown(f"<small>{avatar} {persona}</small>", unsafe_allow_html=True)
+
+        # ---------------------------------------------------------
+        # 6. LOGOUT
+        # ---------------------------------------------------------
+        st.divider()
+        if st.button("🚪 Log Out", use_container_width=True):
+            from utils.auth import logout
+            logout()

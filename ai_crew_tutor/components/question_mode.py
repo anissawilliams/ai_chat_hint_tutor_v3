@@ -7,6 +7,7 @@ from datetime import datetime
 from utils.gamification import add_xp
 from utils.storage import save_user_progress, save_rating
 from utils.data_collection import TutorAnalytics
+from utils.gamification import add_xp, add_affinity
 
 
 # -----------------------
@@ -129,9 +130,16 @@ def build_tutor_context(chat_history, persona):
 def handle_success(persona_avatars, selected_persona):
     """Handle successful code submission"""
     st.success("✅ Great work! That looks correct.")
-    st.balloons() # Visual Reward
+    st.balloons()
 
+    # 1. General XP (Level Up)
     add_xp(st.session_state.user_progress, 15, st.session_state)
+
+    # 2. Specific Persona Affinity (Badge Progress)
+    # We give 5 points per correct answer for that specific tutor
+    add_affinity(st.session_state.user_progress, selected_persona, 5, st.session_state)
+
+    # 3. Save everything
     save_user_progress(st.session_state.user_progress)
 
     challenges = [

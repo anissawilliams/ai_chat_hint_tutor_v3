@@ -1,57 +1,59 @@
 """
 Persona selection grid component
+Displays all tutors (unlocked) with earned affinity badges.
 """
 import streamlit as st
-
-from utils.personas import PERSONA_UNLOCK_LEVELS
 from utils.data_collection import TutorAnalytics
+from utils.gamification import get_affinity_tier
 
 def render_persona_selector(user_level, user_affinity, persona_avatars):
-    """Render persona selection grid"""
+    """Render persona selection grid with Affinity Badges"""
     analytics = TutorAnalytics()
     st.subheader("🎯 Choose Your Tutor")
-    
-    cols_per_row = 3
-    persona_list = list(PERSONA_UNLOCK_LEVELS.keys())
-    
-    for i in range(0, len(persona_list), cols_per_row):
-        cols = st.columns(cols_per_row)
-        for j, col in enumerate(cols):
-            if i + j < len(persona_list):
-                persona_name = persona_list[i + j]
-                unlock_level = PERSONA_UNLOCK_LEVELS[persona_name]
-                is_unlocked = unlock_level <= user_level
-                affinity = user_affinity.get(persona_name, 0)
-                affinity_stars = min(5, affinity // 20)
-                
-                with col:
-                    if is_unlocked:
-                        if st.button(
-                            f"{persona_avatars[persona_name]} {persona_name}",
-                            key=f"persona_{persona_name}",
-                            use_container_width=True,
-                            type="primary" if st.session_state.current_persona == persona_name else "secondary"
-                        ):
-                            st.session_state.current_persona = persona_name
-                            analytics.track_click("Select Persona")
-                            analytics.track_persona_selection(persona_name)
-                            st.rerun()
 
-                        # Show affinity
-                        if affinity > 0:
-                            st.markdown(f"""
-                            <div style='text-align: center;'>
-                                <small>{'⭐' * affinity_stars}{'☆' * (5 - affinity_stars)}</small>
-                                <div class='affinity-bar'>
-                                    <div class='affinity-fill' style='width: {min(affinity, 100)}%;'></div>
-                                </div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                    else:
-                        st.markdown(f"""
-                        <div class='persona-card locked-persona' style='text-align: center; padding: 15px;'>
-                            <div style='font-size: 40px;'>{persona_avatars[persona_name]}</div>
-                            <div>🔒 Level {unlock_level}</div>
-                            <small>{persona_name}</small>
-                        </div>
-                        """, unsafe_allow_html=True)
+    # 1. Get all personas (No filtering/unlocking)
+    persona_list = list(persona_avatars.keys())
+
+    # 2. Create Grid (3 columns)
+    cols = st.columns(3)
+
+    for i, persona_name in enumerate(persona_list):
+        # Calculate which column this card goes into (0, 1, 2)
+        col = cols[i % 3]
+
+        with col:
+            # 3. Calculate Badge Status
+            # We use the user's affinity score to determine the badge
+            current_affinity = user_affinity.get(persona_name, 0)
+            tier_name, _ = get_affinity_tier(current_affinity)
+
+            # Map Tier to Icon
+            badge_icon = ""
+            if tier_name == 'Bronze': badge_icon = "🥉"
+            elif tier_name == 'Silver': badge_icon = "🥈"
+            elif tier_name == 'Gold': badge_icon = "🥇"
+            elif tier_name == 'Platinum': badge_icon = "💎"
+
+            # 4. Determine Button Style
+            # Highlight if currently selected
+            is_selected = (st.session_state.get('current_persona') == persona_name)
+            type_style = "primary" if is_selected else "secondary"
+
+            # 5. Render Button
+            # Label format: "🤖 Batman 🥇"
+            button_label = f"{persona_avatars.get(persona_name, '🤖')} {persona_name} {badge_icon}"
+
+            if st.button(
+                button_label,
+                key=f"persona_{persona_name}",
+                use_container_width=True,
+                type=type_style
+            ):
+                st.session_state.current_persona = persona_name
+                analytics.track_click("Select Persona")
+                analytics.track_persona_selection(persona_name)
+                st.rerun()
+
+            # 6. Optional: Mini Progress Bar (Only if they have some points but no Platinum yet)
+            if 0 < current_affinity < 100:
+                st.progress(min(current_affinity, 100) / 100)

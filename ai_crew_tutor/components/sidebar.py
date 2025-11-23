@@ -23,7 +23,7 @@ def render_sidebar(user_level, user_xp, user_streak, persona_avatars, historical
         <div style="text-align: center; margin-bottom: 20px;">
             <div style="font-size: 3rem;">🎓</div>
             <h3>{username}</h3>
-            <div style="background-color: #262730; padding: 5px 10px; border-radius: 15px; display: inline-block;">
+            <div style="padding: 5px 10px; border-radius: 15px; display: inline-block;">
                 <small>Level {user_level}</small>
             </div>
         </div>

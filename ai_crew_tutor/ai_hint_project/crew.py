@@ -74,7 +74,7 @@ def is_chat():
 
 def create_crew(persona: str, tutoring_context: str, proficiency: str = "Beginner"):
     """
-    Creates the AI Tutor Crew with Socratic Scaffolding + Teacher Feedback Memory.
+    Creates the AI Tutor Crew with DYNAMIC CODE AUDITING.
     """
     print(f"✅ create_crew() called | Persona: {persona} | Proficiency: {proficiency}")
 
@@ -87,60 +87,55 @@ def create_crew(persona: str, tutoring_context: str, proficiency: str = "Beginne
         raise ValueError(f"Unknown persona: {persona}")
 
     # ---------------------------------------------------------
-    # 🧠 A. FETCH TEACHER FEEDBACK (Memory)
+    # 🧠 A. FETCH TEACHER FEEDBACK
     # ---------------------------------------------------------
     recent_critiques = get_recent_feedback(persona, limit=3)
 
     corrections_text = ""
     if recent_critiques:
-        corrections_text = "\n🚨 [WARNING: AVOID PREVIOUS MISTAKES]:\n"
+        corrections_text = "\n🚨 [TEACHER FEEDBACK - OVERRIDE PREVIOUS RULES]:\n"
         for item in recent_critiques:
-            short_context = item.get('bad_response', '')[:50]
-            teacher_note = item.get('critique', '')
-            corrections_text += f"- Context: '{short_context}...'\n"
-            corrections_text += f"  TEACHER FEEDBACK: {teacher_note}\n"
-        corrections_text += "You MUST follow the Teacher Feedback above."
+            corrections_text += f"- PREVIOUS MISTAKE: '{item.get('bad_response', '')[:50]}...'\n"
+            corrections_text += f"  FIX: {item.get('critique', '')}\n"
 
     # ---------------------------------------------------------
-    # 🧠 B. SOCRATIC SCAFFOLDING RULES
+    # 🧠 B. DYNAMIC SCAFFOLDING RULES
     # ---------------------------------------------------------
 
-    # Global Rules
     core_rules = """
     CRITICAL CHAT RULES:
-    1. KEEP IT SHORT: Max 3-4 sentences.
-    2. NO CODE SPOILERS: Do NOT write the exact code solution.
-    3. THE "👉" RULE: Every response MUST end with a specific question asking the student to write code.
-    4. ABSTRACT EXAMPLES: If showing syntax, use 'public type name()' not 'public int sum()'.
+    1. SHORT & PUNCHY: Max 3 sentences.
+    2. NO SPOILERS: Never write the full solution.
+    3. THE "👉" RULE: End with a specific question/instruction.
     """
-
-    # ... inside create_crew ...
 
     if proficiency == "Beginner":
         scaffolding_instruction = f"""
-            {core_rules}
-            [MODE: BEGINNER - SOCRATIC METHOD]
-            1. Break the problem into tiny steps.
-            2. **CHECK INPUT FIRST**: Before explaining Step 1, check if the user just sent the code for it. 
-               - IF YES: Praise them, explain *why* it works, and move immediately to Step 2.
-               - IF NO: Then explain Step 1.
-            3. **BAN LIST**: Do NOT use specific keywords (int, void) in explanations. Ask "What data type?" instead.
-            4. **METAPHOR FIRST**: Use your persona's metaphor.
-            5. TASK: Challenge the student to propose the code for the *current* step.
-            """
+        {core_rules}
+        [MODE: BEGINNER - CODE AUDITOR]
+        1. **ANALYZE INPUT FIRST**: Did the student write code?
+           - IF YES: **Audit it like a compiler.** What is missing?
+             * Example: If they wrote "public sum(int a, int b)", they missed the return type. Tell them: "You missed the return type before the name!"
+             * Example: If they wrote "int sum()", they missed params. Tell them: "The parentheses are empty!"
+             * **DO NOT** repeat generic concepts if they are already writing code. Fix their syntax specifically.
+           - IF NO (Text only): Explain the next tiny step using your persona's metaphor.
+
+        2. **BAN LIST**: Do NOT use keywords (int, void) in explanations unless correcting a specific error.
+        3. **PROGRESSION**: If their line of code is correct, immediately say "Perfect" and ask for the next part (the body).
+        """
     elif proficiency == "Intermediate":
         scaffolding_instruction = f"""
         {core_rules}
         [MODE: INTERMEDIATE]
-        1. Focus on Logic and Data Flow.
-        2. Do NOT explain basic syntax unless asked.
-        3. Ask Socratic questions (e.g., "What return type fits this data?").
+        1. Focus on Logic.
+        2. If code is provided, check for edge cases or logic errors, not just syntax.
+        3. Ask Socratic questions.
         """
     else:  # Advanced
         scaffolding_instruction = f"""
         {core_rules}
         [MODE: ADVANCED]
-        1. Critique code efficiency and cleanliness.
+        1. Critique efficiency and clean code.
         2. Be concise.
         """
 
@@ -187,10 +182,6 @@ def create_crew(persona: str, tutoring_context: str, proficiency: str = "Beginne
         expected_output=task_template['expected_output'],
         agent=agent
     )
-
-    # ---------------------------------------------------------
-    # 🚀 E. EXECUTION
-    # ---------------------------------------------------------
 
     crew = Crew(agents=[agent], tasks=[task], verbose=True)
     result = crew.kickoff()

@@ -15,8 +15,15 @@ sys.path.insert(0, current_dir)
 # sys.path.insert(0, os.path.dirname(current_dir))
 
 # ==========================
-# 2. PAGE CONFIG & IMPORTS
+# 2. AUTH, PAGE CONFIG & IMPORTS
 # ==========================
+from utils.auth import render_login_component
+# Check Authentication FIRST
+user = render_login_component()
+
+if not user:
+    st.stop() # Stop here if not logged in
+
 st.set_page_config(page_title="AI Java Tutor Pro", page_icon="🧠", layout="wide")
 
 # Import your local modules (now that paths are fixed)

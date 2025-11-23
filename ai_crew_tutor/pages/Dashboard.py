@@ -10,7 +10,7 @@ if password != st.secrets.get("ADMIN_PASSWORD", "admin123"):
     st.warning("🔒 Restricted Access")
     st.stop()
 
-st.title("🍎 Teacher Dashboard: Live Analytics")
+st.title("🍎Dashboard: Live Analytics")
 
 # 1. Fetch Data from Firebase
 db = get_db()

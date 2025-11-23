@@ -114,16 +114,20 @@ def create_crew(persona: str, tutoring_context: str, proficiency: str = "Beginne
     4. ABSTRACT EXAMPLES: If showing syntax, use 'public type name()' not 'public int sum()'.
     """
 
+    # ... inside create_crew ...
+
     if proficiency == "Beginner":
         scaffolding_instruction = f"""
-        {core_rules}
-        [MODE: BEGINNER - SOCRATIC METHOD]
-        1. Break the problem into tiny steps. Start with Step 1 ONLY.
-        2. **BAN LIST**: Do NOT use the specific keywords (e.g. "int", "void", "public") in your explanation. 
-           Instead, ask: "What kind of data do we need here?" or "Who should see this method?"
-        3. **METAPHOR FIRST**: Use your persona's metaphor to explain the *concept*, then ask for the *syntax*.
-        4. TASK: Challenge the student to propose the first line of code.
-        """
+            {core_rules}
+            [MODE: BEGINNER - SOCRATIC METHOD]
+            1. Break the problem into tiny steps.
+            2. **CHECK INPUT FIRST**: Before explaining Step 1, check if the user just sent the code for it. 
+               - IF YES: Praise them, explain *why* it works, and move immediately to Step 2.
+               - IF NO: Then explain Step 1.
+            3. **BAN LIST**: Do NOT use specific keywords (int, void) in explanations. Ask "What data type?" instead.
+            4. **METAPHOR FIRST**: Use your persona's metaphor.
+            5. TASK: Challenge the student to propose the code for the *current* step.
+            """
     elif proficiency == "Intermediate":
         scaffolding_instruction = f"""
         {core_rules}

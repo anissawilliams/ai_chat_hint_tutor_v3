@@ -73,7 +73,7 @@ def is_chat():
 
 def create_crew(persona: str, tutoring_context: str, proficiency: str = "Beginner"):
     """
-    Creates the AI Tutor Crew with Adaptive Scaffolding + STRICT Chat Control.
+    Creates the AI Tutor Crew with STRIC SCAFFOLDING to prevent "Spoilers".
     """
     print(f"✅ create_crew() called | Persona: {persona} | Proficiency: {proficiency}")
 
@@ -86,25 +86,26 @@ def create_crew(persona: str, tutoring_context: str, proficiency: str = "Beginne
         raise ValueError(f"Unknown persona: {persona}")
 
     # ---------------------------------------------------------
-    # 🧠 ADAPTIVE SCAFFOLDING + CHAT CONTROL RULES
+    # 🧠 STRICTER SCAFFOLDING RULES
     # ---------------------------------------------------------
 
-    # Core Rules that apply to EVERYONE (Prevents endless chats)
+    # We added Rule #2 (No Code Spoilers) and #4 (Abstract Examples Only)
     core_rules = """
     CRITICAL CHAT RULES:
-    1. KEEP IT SHORT: Max 3-4 sentences. No walls of text.
-    2. STEP-BY-STEP: Do not give the full solution. Guide them one logic block at a time.
-    3. THE "👉" RULE: Every response MUST end with a specific, focused question to prompt the user's next action.
+    1. KEEP IT SHORT: Max 3-4 sentences.
+    2. NO CODE SPOILERS: Do NOT write the exact code the student needs to write. Describe the logic, then ask THEM to write the syntax.
+    3. THE "👉" RULE: Every response MUST end with a specific question asking the student to write code.
+    4. ABSTRACT EXAMPLES ONLY: If you must show syntax, use generic placeholders (e.g., 'public void methodName()') instead of the actual solution.
     """
 
     if proficiency == "Beginner":
         scaffolding_instruction = f"""
         {core_rules}
         [MODE: BEGINNER]
-        1. Use the "Step X —" format explicitly.
-        2. Explain keywords (like 'void', 'public') simply.
-        3. If they fail twice, offer a fill-in-the-blank snippet.
-        4. Tone: Highly encouraging.
+        1. Break the problem into Step 1, Step 2, etc.
+        2. Focus ONLY on the current step.
+        3. Explain keywords simply (e.g., "we need 'int' because it returns a number").
+        4. TASK: Ask the student to write the code for Step 1. Do not do it for them.
         """
     elif proficiency == "Intermediate":
         scaffolding_instruction = f"""
@@ -112,16 +113,14 @@ def create_crew(persona: str, tutoring_context: str, proficiency: str = "Beginne
         [MODE: INTERMEDIATE]
         1. Focus on Logic and Data Flow.
         2. Do NOT explain basic syntax unless asked.
-        3. Ask Socratic questions (e.g., "What does this loop condition imply?").
-        4. Tone: Professional partner.
+        3. Ask Socratic questions (e.g., "What return type fits this data?").
         """
     else:  # Advanced
         scaffolding_instruction = f"""
         {core_rules}
         [MODE: ADVANCED]
-        1. Critique code efficiency (Big O) and cleanliness.
-        2. Be concise and technical.
-        3. Challenge them to optimize.
+        1. Critique code efficiency and cleanliness.
+        2. Be concise.
         """
 
     # ---------------------------------------------------------
@@ -142,7 +141,7 @@ def create_crew(persona: str, tutoring_context: str, proficiency: str = "Beginne
     """
 
     # ---------------------------------------------------------
-    # 🤖 AGENT & TASK SETUP (Standard)
+    # 🤖 AGENT & TASK SETUP
     # ---------------------------------------------------------
 
     llm = get_llm()

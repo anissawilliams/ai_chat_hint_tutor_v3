@@ -4,6 +4,9 @@ Sidebar component with stats and navigation (Streamlit pages compatible)
 import streamlit as st
 from utils.personas import PERSONA_UNLOCK_LEVELS, get_next_unlock
 
+from ai_crew_tutor.utils.storage import save_user_progress
+
+
 def navigate_to(page_name: str):
     """Set query params to navigate to a page"""
     st.experimental_set_query_params(page=page_name)
@@ -28,8 +31,31 @@ def render_sidebar(user_level, user_xp, user_streak, persona_avatars, historical
 
         st.divider()
 
+        # ... existing sidebar code ...
 
 
+        st.subheader("⚙️ Learning Settings")
+
+        # 1. Get current value from session state (default to Beginner)
+        current_proficiency = st.session_state.user_progress.get('proficiency', 'Beginner')
+
+        # 2. The Radio Button
+        selected_proficiency = st.radio(
+            "Your Java Experience:",
+            options=["Beginner", "Intermediate", "Advanced"],
+            index=["Beginner", "Intermediate", "Advanced"].index(current_proficiency),
+            help="This changes how much the AI helps you. Beginner = more hints. Advanced = direct code reviews."
+        )
+
+        # 3. Save if changed
+        if selected_proficiency != current_proficiency:
+            st.session_state.user_progress['proficiency'] = selected_proficiency
+            # Save to Firebase immediately
+            save_user_progress(st.session_state.user_progress)
+            st.rerun()  # Refresh so the AI picks up the new setting immediately
+
+        # ... existing footer code ...
+        st.divider()
         # =================
         # Unlock Progress
         # =================

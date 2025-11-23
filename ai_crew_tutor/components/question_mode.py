@@ -17,7 +17,7 @@ def _ensure_step_state():
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = []
     if 'user_progress' not in st.session_state:
-        st.session_state.user_progress = {'level': 1, 'xp': 0, 'affinity': {}}
+        st.session_state.user_progress = {'level': 1, 'xp': 0, 'affinity': {}, 'proficiency': 'Beginner'}
     if 'show_rating' not in st.session_state:
         st.session_state.show_rating = False
 
@@ -44,33 +44,28 @@ def smart_validate_java_code(user_input, conversation_context=""):
     Returns: (is_valid, feedback_message, should_celebrate)
     """
     code = user_input.lower()
-
-    # Extract what they're trying to do from context
     context_lower = conversation_context.lower()
 
     # Check for basic method structure
     has_method_signature = ('(' in code and ')' in code and
                            any(rt in code for rt in ['int', 'string', 'void', 'boolean', 'double', 'list', 'public', 'private']))
 
-    # --- Sum/Add methods ---
+    # --- Scenario 1: Sum/Add methods ---
     if any(word in context_lower for word in ['sum', 'add']):
         has_body = '{' in code and '}' in code
         has_return = 'return' in code
         has_addition = '+' in code
 
-        # Just signature? Good start, but needs body
         if has_method_signature and not has_body:
-            return (False, "Good signature! Now add the body with curly braces { } that adds the numbers and returns the result.", False)
+            return (False, "Good signature! Now add the body with curly braces { }.", False)
 
-        # Has signature and body but missing logic?
         if has_method_signature and has_body and not (has_return and has_addition):
-            return (False, "You have the structure! Now add: 1) the addition using +, and 2) return the result.", False)
+            return (False, "Structure looks good! Now add the logic: use '+' to add and 'return' to send it back.", False)
 
-        # Complete solution!
         if has_method_signature and has_body and has_return and has_addition:
             return (True, "Perfect! Your method works correctly.", True)
 
-    # --- Stream operations (filter, map, etc.) ---
+    # --- Scenario 2: Stream operations ---
     elif any(word in context_lower for word in ['stream', 'filter', 'map', 'collect']):
         has_stream = 'stream()' in code
         has_collect = 'collect' in code
@@ -80,100 +75,51 @@ def smart_validate_java_code(user_input, conversation_context=""):
         elif has_method_signature:
             return (False, "Good start! Remember to use .stream() to convert the list, then chain your operations.", False)
 
-    # --- Generic method check ---
+    # --- Scenario 3: Generic Code Check (Fallback) ---
     elif has_method_signature:
         has_body = '{' in code and '}' in code
         has_return = 'return' in code
 
         if has_body and has_return:
-            return (True, "Nice work! Your method structure looks good.", True)
+            return (True, "Nice work! Your method structure looks valid.", True)
         else:
-            return (False, "Good signature! Now add the method body with your logic and a return statement.", False)
+            return (False, "Good signature! Now add the method body logic.", False)
 
     # Not recognizable as a complete method
     return (False, "", False)
 
 
 # -----------------------
-# Context Building
+# Context Building (Clean Version)
 # -----------------------
 def build_tutor_context(chat_history, persona):
-    """Build simple context for the AI tutor"""
-
+    """
+    Build context.
+    NOTE: The 'Strict Rules' (Step-by-step, Keep it short) have been moved to crew.py.
+    We keep this clean to avoid confusing the AI with duplicate instructions.
+    """
     # Get conversation so far
     conversation = ""
-    for msg in chat_history:
+    # Only grab the last 10 messages to keep the context window focused
+    recent_history = chat_history[-10:]
+
+    for msg in recent_history:
         role = "Student" if msg["role"] == "user" else persona
         conversation += f"{role}: {msg['content']}\n\n"
 
-    # Count how many messages (to determine if this is the first interaction)
-    is_first_message = len([m for m in chat_history if m["role"] == "user"]) == 1
+    # Context Wrapper
+    context = f"""
+    The following is a conversation between a Student and {persona} (Java Tutor).
+    
+    CONVERSATION HISTORY:
+    {conversation}
+    
+    Student's Last Input: {chat_history[-1]['content']}
+    
+    Respond as {persona}.
+    """
 
-    # Adjust guidance based on whether student has submitted code yet
-    has_submitted_code = any(looks_like_code(msg["content"]) for msg in chat_history if msg["role"] == "user")
-
-    if is_first_message and not has_submitted_code:
-        # First interaction - they're asking what to build
-        context = f"""You are {persona}, a Java tutor using guided learning methodology.
-
-        CORE PRINCIPLE: Guide through questions, NOT answers. Make the student think and work.
-
-        STRICT RULES:
-        - Keep responses SHORT (3-5 sentences max)
-        - Break problems into tiny, manageable steps
-        - ONLY give the full solution when the student has provided the correct and complete answer
-        - Wait for student's answer before proceeding
-        - Use "Step X —" structure when guiding
-        - End EVERY response with a focused question using: "👉 [specific question]?"
-        - If student is stuck, ask a simpler leading question
-        - Check understanding by asking them to explain back
-
-        RESPONSE PATTERN:
-        1. Acknowledge their goal briefly
-        2. Identify the FIRST small step
-        3. Ask a question about that step only
-        4. Show their answer in code blocks
-        5. Wait for their response
-
-        EXAMPLE:
-        "Got it! You need to double each number in a List.
-
-        Step 1 — First, let's think about the method signature. 
-
-        👉 What should this method accept as input, and what should it return?"
-
-        Student's question: {chat_history[-1]['content']}
-
-        Respond as {persona} - ask ONE question to start:"""
-    else:
-        # For ongoing conversation
-        context = f"""You are {persona}, a Java tutor. Continue guiding this student in your unique way.
-
-        CRITICAL - ONLY GIVE FULL SOLUTIONS WHEN STUDENTS PROVIDE THE CORRECT ANSWER:
-        - Respond in 3-5 sentences max
-        - If they answered correctly: praise briefly, then ask about the NEXT step
-        - If they're stuck: ask a simpler leading question
-        - If they're wrong: gently correct and ask them to try again
-        - Only reveal code when they've worked through the logic of the previous hint
-        - User triple backticks (```) to format code blocks
-        - Check understanding: ask them to explain their reasoning
-        - End with: "👉 [one specific question]?"
-        - Respond ONLY as {persona}
-        - If they're stuck, ask a simpler leading question
-        - If they're right, show the answer in code blocks
-
-        Conversation history:
-        """
-        # Add recent conversation history (last 8 messages for better context)
-        recent_history = chat_history[-8:]
-        for msg in recent_history:
-            if msg["role"] == "user":
-                context += f"\nStudent: {msg['content']}\n"
-            else:
-                context += f"\n{persona}: {msg['content']}\n"
-
-        context += f"\n{persona} (guide with ONE question, wait for response):"
-        st.session_state.show_rating = True
+    st.session_state.show_rating = True
     return context
 
 
@@ -183,28 +129,27 @@ def build_tutor_context(chat_history, persona):
 def handle_success(persona_avatars, selected_persona):
     """Handle successful code submission"""
     st.success("✅ Great work! That looks correct.")
+    st.balloons() # Visual Reward
 
     add_xp(st.session_state.user_progress, 15, st.session_state)
     save_user_progress(st.session_state.user_progress)
 
     challenges = [
-        "Want to try another challenge? How about creating a method that finds the **maximum** of two integers?",
+        "Want to try another? Create a method that finds the **maximum** of two integers.",
         "Nice! Ready for more? Try creating a method that **reverses a String**.",
-        "Excellent! Let's level up - create a method that **filters even numbers** from a List<Integer>.",
+        "Excellent! Let's level up - create a method that **filters even numbers** from a List.",
     ]
 
     import random
     next_challenge = random.choice(challenges)
-
     response = f"Perfect! Your solution works.\n\n{next_challenge}"
 
-    with st.chat_message("assistant", avatar=persona_avatars.get(selected_persona, "🤖")):
-        st.markdown(response)
-        st.session_state.chat_history.append({
-            "role": "assistant",
-            "content": response,
-            "avatar": persona_avatars.get(selected_persona, "🤖")
-        })
+    # Append AI response to history so it shows up
+    st.session_state.chat_history.append({
+        "role": "assistant",
+        "content": response,
+        "avatar": persona_avatars.get(selected_persona, "🤖")
+    })
 
 
 # -----------------------
@@ -236,10 +181,10 @@ def render_chat_interface(selected_persona, persona_avatars, create_crew, user_l
     user_input = st.chat_input("Ask a question or paste your code...")
 
     if user_input:
-        # 1. Increment Attempt Counter (User just did something)
+        # 1. Track attempt count
         st.session_state.attempt_counter += 1
 
-        # Add user message
+        # 2. Add user message
         st.session_state.chat_history.append({
             "role": "user",
             "content": user_input,
@@ -249,52 +194,54 @@ def render_chat_interface(selected_persona, persona_avatars, create_crew, user_l
         with st.chat_message("user", avatar="🧑‍💻"):
             st.markdown(user_input)
 
-        # Try to validate if it's code
+        # 3. Validation Logic
         validation_result = None
-        if looks_like_code(user_input):
-            # Get conversation context for smart validation
-            full_conversation = "\n".join([msg['content'] for msg in st.session_state.chat_history])
+        should_celebrate = False
 
-            # Validate
+        if looks_like_code(user_input):
+            full_conversation = "\n".join([msg['content'] for msg in st.session_state.chat_history])
             is_valid, feedback, should_celebrate = smart_validate_java_code(user_input, full_conversation)
 
-            # --- TRACK LEARNING OUTCOME ---
+            # Analytics: Track Learning Outcome
             analytics.track_learning_outcome(
                 code_input=user_input,
                 is_correct=should_celebrate,
                 attempt_number=st.session_state.attempt_counter,
                 persona_name=selected_persona
             )
-            # ------------------------------
 
             if should_celebrate:
-                # Reset counter on success
                 st.session_state.attempt_counter = 0
-
                 handle_success(persona_avatars, selected_persona)
                 st.rerun()
                 return
             elif feedback:
-                # Code detected but needs improvement - include feedback
                 validation_result = f"\n**Code Feedback**: {feedback}"
 
-        # Build context and get AI response
+        # 4. Generate AI Response
         context = build_tutor_context(st.session_state.chat_history, selected_persona)
 
-        # Add validation feedback to context if available
         if validation_result:
             context += validation_result
 
+        # Retrieve Proficiency setting (Defaults to Beginner)
+        proficiency = st.session_state.user_progress.get('proficiency', 'Beginner')
+
         with st.chat_message("assistant", avatar=persona_avatars.get(selected_persona, "🤖")):
-            with st.spinner(f"{selected_persona} is thinking..."):
-                response = create_crew(selected_persona, context)
+            # Show "Beginner Mode" etc in the spinner so user knows it's working
+            with st.spinner(f"{selected_persona} is thinking ({proficiency} Mode)..."):
+
+                # CRITICAL UPDATE: Pass proficiency to crew.py
+                response = create_crew(selected_persona, context, proficiency)
+
                 st.markdown(response)
+
                 st.session_state.chat_history.append({
                     "role": "assistant",
                     "content": response,
                     "avatar": persona_avatars.get(selected_persona, "🤖")
                 })
-                # Track the standard question analytics
+
                 analytics.track_question(question=user_input, response=response, persona=selected_persona)
 
         st.rerun()
@@ -311,18 +258,8 @@ def render_question_mode(selected_persona, persona_avatars, create_crew, user_le
     st.divider()
     render_chat_interface(selected_persona, persona_avatars, create_crew, user_level)
     analytics.track_click("Chat Mode")
-    show_rating(selected_persona)
 
-
-# -----------------------
-# Rating
-# -----------------------
-def show_rating(selected_persona):
-    """Rating system"""
-    analytics = TutorAnalytics()
-    # (Commented out as requested, relying on Survey page)
-
-
-# Fixed Button Logic
-if st.button("Go to Survey"):
-    st.switch_page("pages/Survey.py")
+    st.divider()
+    # Updated Survey Link
+    if st.button("📝 Give Feedback (Survey)"):
+        st.switch_page("pages/Survey.py")

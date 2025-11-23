@@ -3,9 +3,9 @@ Sidebar component with stats and navigation (Streamlit pages compatible)
 """
 import streamlit as st
 from utils.personas import PERSONA_UNLOCK_LEVELS, get_next_unlock
-
-from ai_crew_tutor.utils.storage import save_user_progress
-
+from utils.storage import save_user_progress
+# ✅ NEW: Import Analytics
+from utils.data_collection import TutorAnalytics
 
 def navigate_to(page_name: str):
     """Set query params to navigate to a page"""
@@ -13,11 +13,15 @@ def navigate_to(page_name: str):
 
 def render_sidebar(user_level, user_xp, user_streak, persona_avatars, historical_df):
     """Render the sidebar with stats, controls, and page navigation"""
+
+    # ✅ Initialize Analytics
+    analytics = TutorAnalytics()
+
     with st.sidebar:
         st.title("⚙️ Control Center")
 
         # =================
-        # User Stats
+        # 1. User Stats
         # =================
         st.header("📊 Your Stats")
         col1, col2 = st.columns(2)
@@ -26,38 +30,50 @@ def render_sidebar(user_level, user_xp, user_streak, persona_avatars, historical
             st.metric("Streak", f"{user_streak} 🔥")
         with col2:
             st.metric("XP", user_xp)
+            # Calculate unlocked count safely
             unlocked_count = sum(1 for p in PERSONA_UNLOCK_LEVELS if PERSONA_UNLOCK_LEVELS[p] <= user_level)
             st.metric("Tutors", f"{unlocked_count}/{len(PERSONA_UNLOCK_LEVELS)}")
 
         st.divider()
 
-        # ... existing sidebar code ...
-
-
+        # =================
+        # 2. Learning Settings (Upgraded)
+        # =================
         st.subheader("⚙️ Learning Settings")
 
-        # 1. Get current value from session state (default to Beginner)
+        # Get current value (Safe .get with default)
+        if 'user_progress' not in st.session_state:
+             st.session_state.user_progress = {}
+
         current_proficiency = st.session_state.user_progress.get('proficiency', 'Beginner')
 
-        # 2. The Radio Button
+        # The Radio Button
         selected_proficiency = st.radio(
             "Your Java Experience:",
             options=["Beginner", "Intermediate", "Advanced"],
             index=["Beginner", "Intermediate", "Advanced"].index(current_proficiency),
-            help="This changes how much the AI helps you. Beginner = more hints. Advanced = direct code reviews."
+            help="Beginner: More hints. Intermediate: Logic focus. Advanced: Code reviews.",
+            key="prof_selector"
         )
 
-        # 3. Save if changed
+        # Logic: Save & Track if changed
         if selected_proficiency != current_proficiency:
+            # 1. Update State
             st.session_state.user_progress['proficiency'] = selected_proficiency
-            # Save to Firebase immediately
-            save_user_progress(st.session_state.user_progress)
-            st.rerun()  # Refresh so the AI picks up the new setting immediately
 
-        # ... existing footer code ...
+            # 2. Save to Firebase
+            save_user_progress(st.session_state.user_progress)
+
+            # 3. ✅ ANALYTICS: Track the change event
+            analytics.track_click(f"Changed Proficiency to {selected_proficiency}", "settings_change")
+
+            # 4. Refresh app to apply new scaffolding immediately
+            st.rerun()
+
         st.divider()
+
         # =================
-        # Unlock Progress
+        # 3. Unlock Progress
         # =================
         st.header("🔓 Unlock Progress")
         next_persona, next_level = get_next_unlock(user_level)
@@ -71,10 +87,13 @@ def render_sidebar(user_level, user_xp, user_streak, persona_avatars, historical
 
         st.divider()
 
-        # Quick stats from history
+        # =================
+        # 4. History Stats
         # =================
         if not historical_df.empty:
             st.header("📈 All-Time Stats")
-            avg_rating = historical_df['clarity'].mean() if 'clarity' in historical_df.columns else 0
-            st.metric("Avg Clarity", f"{avg_rating:.1f}⭐")
+            # Safe check if 'clarity' exists in your historical data
+            if 'clarity' in historical_df.columns:
+                avg_rating = historical_df['clarity'].mean()
+                st.metric("Avg Clarity", f"{avg_rating:.1f}⭐")
             st.metric("Total Questions", len(historical_df))

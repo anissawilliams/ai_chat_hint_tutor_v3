@@ -78,6 +78,43 @@ def send_ga_event(event_name, params=None):
             st.sidebar.error(f"❌ GA Failed: {e}")
 
 
+# utils/data_collection.py
+
+def save_training_feedback(persona, bad_response, critique):
+    """
+    Saves a critique of the AI to Firebase to 'train' future responses.
+    """
+    db = initialize_firebase()
+    if not db: return
+
+    data = {
+        "persona": persona,
+        "bad_response": bad_response,
+        "critique": critique,
+        "timestamp": datetime.now()
+    }
+    db.collection('ai_training_feedback').add(data)
+
+
+def get_recent_feedback(persona, limit=3):
+    """
+    Retrieves the last few critiques to inject into the AI's prompt.
+    """
+    db = initialize_firebase()
+    if not db: return []
+
+    try:
+        # Get feedback specific to this persona
+        docs = db.collection('ai_training_feedback') \
+            .where('persona', '==', persona) \
+            .order_by('timestamp', direction=firestore.Query.DESCENDING) \
+            .limit(limit) \
+            .stream()
+
+        return [doc.to_dict() for doc in docs]
+    except Exception as e:
+        print(f"Feedback fetch error: {e}")
+        return []
 # ---------------------------------------------------------
 # MAIN ANALYTICS CLASS
 # ---------------------------------------------------------

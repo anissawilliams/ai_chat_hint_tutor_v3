@@ -179,11 +179,28 @@ def render_chat_interface(selected_persona, persona_avatars, create_crew, user_l
 
     st.caption("Ask me anything about Java - I'll guide you through it!")
 
-    # Display chat history
-    for message in st.session_state.chat_history:
+    # CHANGE: Use enumerate to get an index 'i' for unique keys
+    for i, message in enumerate(st.session_state.chat_history):
         avatar = message.get("avatar", "🧑‍💻" if message["role"] == "user" else "🤖")
+
         with st.chat_message(message["role"], avatar=avatar):
             st.markdown(message["content"])
+
+            # === NEW: TRAINING UI ===
+            # Only show training options for AI messages
+            if message["role"] == "assistant":
+                with st.expander("🛠️ Teacher Only: Train AI on this response"):
+                    # Unique key needed for every input widget
+                    critique = st.text_input("What did the AI do wrong?", key=f"critique_{i}")
+
+                    if st.button("Submit Feedback", key=f"btn_train_{i}"):
+                        save_training_feedback(
+                            persona=selected_persona,
+                            bad_response=message["content"],
+                            critique=critique
+                        )
+                        st.success("Feedback saved! The AI will learn from this.")
+    # ========================
 
     # Chat input
     user_input = st.chat_input("Ask a question or paste your code...")

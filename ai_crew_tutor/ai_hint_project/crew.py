@@ -13,6 +13,8 @@ sys.path.insert(0, base_dir)
 
 # Import RAG builder
 from ai_hint_project.tools.rag_tool import build_rag_tool
+# Import the Memory/Feedback system
+from utils.data_collection import get_recent_feedback
 
 print("✅ crew.py loaded!")
 
@@ -20,7 +22,6 @@ print("✅ crew.py loaded!")
 # 1. SETUP & CONFIG
 # ---------------------------------------------------------
 
-# Retrieve API Key
 try:
     OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 except:
@@ -30,7 +31,7 @@ except:
 
 def get_llm():
     return ChatOpenAI(
-        model="gpt-5-mini",  # ✅ Using preferred model
+        model="gpt-5-mini",  # Using your preferred model
         api_key=OPENAI_API_KEY,
         temperature=0.7,
     )
@@ -55,7 +56,7 @@ def format_response(raw_text):
     # Remove <think> tags (common in reasoning models)
     cleaned = re.sub(r"<think>.*?</think>\n?", "", str(raw_text), flags=re.DOTALL)
 
-    # Normalize code blocks if the model lazily used indentation
+    # Normalize code blocks
     if "public static" in cleaned or "def " in cleaned:
         cleaned = re.sub(r"(?:\n\s{4,}.*)+", lambda m: f"\n```java\n{m.group(0)}\n```", cleaned)
 
@@ -73,7 +74,7 @@ def is_chat():
 
 def create_crew(persona: str, tutoring_context: str, proficiency: str = "Beginner"):
     """
-    Creates the AI Tutor Crew with STRIC SCAFFOLDING to prevent "Spoilers".
+    Creates the AI Tutor Crew with Socratic Scaffolding + Teacher Feedback Memory.
     """
     print(f"✅ create_crew() called | Persona: {persona} | Proficiency: {proficiency}")
 
@@ -86,26 +87,42 @@ def create_crew(persona: str, tutoring_context: str, proficiency: str = "Beginne
         raise ValueError(f"Unknown persona: {persona}")
 
     # ---------------------------------------------------------
-    # 🧠 STRICTER SCAFFOLDING RULES
+    # 🧠 A. FETCH TEACHER FEEDBACK (Memory)
+    # ---------------------------------------------------------
+    recent_critiques = get_recent_feedback(persona, limit=3)
+
+    corrections_text = ""
+    if recent_critiques:
+        corrections_text = "\n🚨 [WARNING: AVOID PREVIOUS MISTAKES]:\n"
+        for item in recent_critiques:
+            short_context = item.get('bad_response', '')[:50]
+            teacher_note = item.get('critique', '')
+            corrections_text += f"- Context: '{short_context}...'\n"
+            corrections_text += f"  TEACHER FEEDBACK: {teacher_note}\n"
+        corrections_text += "You MUST follow the Teacher Feedback above."
+
+    # ---------------------------------------------------------
+    # 🧠 B. SOCRATIC SCAFFOLDING RULES
     # ---------------------------------------------------------
 
-    # We added Rule #2 (No Code Spoilers) and #4 (Abstract Examples Only)
+    # Global Rules
     core_rules = """
     CRITICAL CHAT RULES:
     1. KEEP IT SHORT: Max 3-4 sentences.
-    2. NO CODE SPOILERS: Do NOT write the exact code the student needs to write. Describe the logic, then ask THEM to write the syntax.
+    2. NO CODE SPOILERS: Do NOT write the exact code solution.
     3. THE "👉" RULE: Every response MUST end with a specific question asking the student to write code.
-    4. ABSTRACT EXAMPLES ONLY: If you must show syntax, use generic placeholders (e.g., 'public void methodName()') instead of the actual solution.
+    4. ABSTRACT EXAMPLES: If showing syntax, use 'public type name()' not 'public int sum()'.
     """
 
     if proficiency == "Beginner":
         scaffolding_instruction = f"""
         {core_rules}
-        [MODE: BEGINNER]
-        1. Break the problem into Step 1, Step 2, etc.
-        2. Focus ONLY on the current step.
-        3. Explain keywords simply (e.g., "we need 'int' because it returns a number").
-        4. TASK: Ask the student to write the code for Step 1. Do not do it for them.
+        [MODE: BEGINNER - SOCRATIC METHOD]
+        1. Break the problem into tiny steps. Start with Step 1 ONLY.
+        2. **BAN LIST**: Do NOT use the specific keywords (e.g. "int", "void", "public") in your explanation. 
+           Instead, ask: "What kind of data do we need here?" or "Who should see this method?"
+        3. **METAPHOR FIRST**: Use your persona's metaphor to explain the *concept*, then ask for the *syntax*.
+        4. TASK: Challenge the student to propose the first line of code.
         """
     elif proficiency == "Intermediate":
         scaffolding_instruction = f"""
@@ -124,7 +141,7 @@ def create_crew(persona: str, tutoring_context: str, proficiency: str = "Beginne
         """
 
     # ---------------------------------------------------------
-    # 📚 RAG & CONTEXT ASSEMBLY
+    # 📚 C. CONTEXT ASSEMBLY
     # ---------------------------------------------------------
 
     rag_context = rag_tool(tutoring_context)
@@ -132,6 +149,8 @@ def create_crew(persona: str, tutoring_context: str, proficiency: str = "Beginne
     full_query_context = f"""
     SYSTEM INSTRUCTIONS:
     {scaffolding_instruction}
+
+    {corrections_text}
 
     USER QUERY / CONTEXT:
     {tutoring_context}
@@ -141,7 +160,7 @@ def create_crew(persona: str, tutoring_context: str, proficiency: str = "Beginne
     """
 
     # ---------------------------------------------------------
-    # 🤖 AGENT & TASK SETUP
+    # 🤖 D. AGENT & TASK SETUP
     # ---------------------------------------------------------
 
     llm = get_llm()
@@ -164,6 +183,10 @@ def create_crew(persona: str, tutoring_context: str, proficiency: str = "Beginne
         expected_output=task_template['expected_output'],
         agent=agent
     )
+
+    # ---------------------------------------------------------
+    # 🚀 E. EXECUTION
+    # ---------------------------------------------------------
 
     crew = Crew(agents=[agent], tasks=[task], verbose=True)
     result = crew.kickoff()

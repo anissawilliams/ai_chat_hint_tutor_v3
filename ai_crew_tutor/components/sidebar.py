@@ -141,7 +141,6 @@ def render_sidebar(user_level, user_xp, user_streak, persona_avatars, historical
         # ---------------------------------------------------------
         # 6. LOGOUT
         # ---------------------------------------------------------
-        st.divider()
         if st.button("🚪 Log Out", use_container_width=True):
             from utils.auth import logout
             logout()

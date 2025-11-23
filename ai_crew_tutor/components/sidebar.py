@@ -36,39 +36,54 @@ def render_sidebar(user_level, user_xp, user_streak, persona_avatars, historical
 
         st.divider()
 
+        # ... inside render_sidebar ...
+
         # =================
-        # 2. Learning Settings (Upgraded)
+        # 2. Learning Settings (Sleek Version)
         # =================
         st.subheader("⚙️ Learning Settings")
 
-        # Get current value (Safe .get with default)
         if 'user_progress' not in st.session_state:
-             st.session_state.user_progress = {}
+            st.session_state.user_progress = {}
 
         current_proficiency = st.session_state.user_progress.get('proficiency', 'Beginner')
 
-        # The Radio Button
-        selected_proficiency = st.radio(
-            "Your Java Experience:",
-            options=["Beginner", "Intermediate", "Advanced"],
-            index=["Beginner", "Intermediate", "Advanced"].index(current_proficiency),
-            help="Beginner: More hints. Intermediate: Logic focus. Advanced: Code reviews.",
-            key="prof_selector"
-        )
+        # OPTIONS:
+        # 1. st.pills is the modern "Chip" look (Streamlit 1.40+)
+        # 2. If that fails, use st.radio(..., horizontal=True)
+        try:
+            selected_proficiency = st.pills(
+                "Teaching Style",
+                options=["Beginner", "Intermediate", "Advanced"],
+                default=current_proficiency,
+                selection_mode="single",
+                key="prof_selector"
+            )
+        except AttributeError:
+            # Fallback for older Streamlit versions
+            selected_proficiency = st.radio(
+                "Teaching Style",
+                options=["Beginner", "Intermediate", "Advanced"],
+                index=["Beginner", "Intermediate", "Advanced"].index(current_proficiency),
+                horizontal=True,  # <--- This fixes the "funky" vertical look
+                key="prof_selector"
+            )
 
         # Logic: Save & Track if changed
-        if selected_proficiency != current_proficiency:
-            # 1. Update State
+        # Note: st.pills returns None if deselected, so we handle that
+        if selected_proficiency and selected_proficiency != current_proficiency:
             st.session_state.user_progress['proficiency'] = selected_proficiency
-
-            # 2. Save to Firebase
             save_user_progress(st.session_state.user_progress)
-
-            # 3. ✅ ANALYTICS: Track the change event
             analytics.track_click(f"Changed Proficiency to {selected_proficiency}", "settings_change")
-
-            # 4. Refresh app to apply new scaffolding immediately
             st.rerun()
+
+        # Helper text to explain the mode
+        mode_explanations = {
+            "Beginner": "🌱 Step-by-step guidance. More hints.",
+            "Intermediate": "🛠️ Logic focus. Socratic questioning.",
+            "Advanced": "🚀 Code reviews. Efficiency focus."
+        }
+        st.caption(mode_explanations.get(selected_proficiency, ""))
 
         st.divider()
 

@@ -2,21 +2,18 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from utils.storage import get_db
-import datetime
 
 # ---------------------------------------------------------
 # 1. SETUP & AUTH
 # ---------------------------------------------------------
-st.set_page_config(page_title="Dashboard", page_icon="🍎", layout="wide")
+st.set_page_config(page_title="Teacher Dashboard", page_icon="🍎", layout="wide")
 
-# Simple password check to keep students out
 password = st.sidebar.text_input("Admin Password", type="password")
 if password != st.secrets.get("ADMIN_PASSWORD", "admin123"):
     st.info("🔒 Enter admin password to view analytics.")
     st.stop()
 
 st.title("🍎 Live Classroom Analytics")
-st.markdown("Monitor student engagement, struggle points, and success rates in real-time.")
 
 # ---------------------------------------------------------
 # 2. DATA FETCHING
@@ -27,132 +24,109 @@ if not db:
     st.stop()
 
 
-@st.cache_data(ttl=60)  # Refresh data every minute
-def fetch_data():
-    # 1. Fetch Learning Outcomes (The "Reasonable Way" Metric)
+@st.cache_data(ttl=60)
+def fetch_analytics_data():
+    # 1. Fetch Learning Outcomes (Performance)
     outcomes_ref = db.collection('learning_outcomes').stream()
     outcomes_data = []
     for doc in outcomes_ref:
         d = doc.to_dict()
-        # Handle timestamp conversion
-        if 'timestamp' in d:
-            d['timestamp'] = pd.to_datetime(d['timestamp'])
+        if 'timestamp' in d: d['timestamp'] = pd.to_datetime(d['timestamp'])
         outcomes_data.append(d)
 
-    return pd.DataFrame(outcomes_data)
+    # 2. Fetch Users (Engagement/Retention)
+    users_ref = db.collection('users').stream()
+    users_data = []
+    for doc in users_ref:
+        d = doc.to_dict()
+        users_data.append(d)
+
+    return pd.DataFrame(outcomes_data), pd.DataFrame(users_data)
 
 
-df = fetch_data()
-
-if df.empty:
-    st.warning("No learning data available yet. Wait for students to submit code.")
-    st.stop()
+df_outcomes, df_users = fetch_analytics_data()
 
 # ---------------------------------------------------------
-# 3. HIGH-LEVEL KPI CARDS
+# 3. ENGAGEMENT & RETENTION (New Section)
 # ---------------------------------------------------------
-col1, col2, col3, col4 = st.columns(4)
+st.header("🔥 Engagement & Retention")
 
-with col1:
-    # Total successful code submissions
-    total_success = df[df['is_correct'] == True].shape[0]
-    st.metric("✅ Total Solved", total_success)
+if not df_users.empty:
+    col1, col2, col3, col4 = st.columns(4)
 
-with col2:
-    # "Reasonable Way" Metric: Avg Attempts per Success
-    # We filter for successes, then check what the attempt number was
-    if total_success > 0:
-        avg_attempts = df[df['is_correct'] == True]['attempt_number'].mean()
-        delta_color = "normal" if avg_attempts < 5 else "inverse"  # Red if > 5 tries
-        st.metric("Avg Attempts to Solve", f"{avg_attempts:.1f}", delta_color=delta_color)
-    else:
-        st.metric("Avg Attempts", "-")
+    with col1:
+        total_students = len(df_users)
+        st.metric("Total Students", total_students)
 
-with col3:
-    # Success Rate (Correct / Total Submissions)
-    if len(df) > 0:
-        rate = (total_success / len(df)) * 100
-        st.metric("Success Rate", f"{rate:.1f}%")
+    with col2:
+        # Retention: Students with a streak > 1 day
+        returning_students = df_users[df_users['streak'] > 1].shape[0]
+        retention_rate = (returning_students / total_students) * 100 if total_students > 0 else 0
+        st.metric("Returning Students (Streak > 1)", f"{returning_students} ({retention_rate:.0f}%)")
 
-with col4:
-    # Stickiness: Unique Students
-    if 'session_id' in df.columns:
-        unique_students = df['session_id'].nunique()
-        st.metric("Active Students", unique_students)
+    with col3:
+        # Gamification: Total XP earned by the class
+        class_xp = df_users['xp'].sum()
+        st.metric("Total Class XP", f"{class_xp:,}")
+
+    with col4:
+        # Level distribution
+        avg_level = df_users['level'].mean()
+        st.metric("Avg Student Level", f"{avg_level:.1f}")
+
+    # Proficiency Pie Chart
+    if 'proficiency' in df_users.columns:
+        st.subheader("Student Proficiency Breakdown")
+        st.caption("Self-reported experience levels")
+
+        # Fill NA with 'Beginner' (default)
+        df_users['proficiency'] = df_users['proficiency'].fillna('Beginner')
+
+        prof_counts = df_users['proficiency'].value_counts().reset_index()
+        prof_counts.columns = ['Level', 'Count']
+
+        fig_prof = px.pie(prof_counts, values='Count', names='Level', hole=0.4, color='Level',
+                          color_discrete_map={'Beginner': '#43e97b', 'Intermediate': '#38f9d7', 'Advanced': '#667eea'})
+        st.plotly_chart(fig_prof, use_container_width=True)
+
+else:
+    st.info("No user data yet.")
 
 st.divider()
 
 # ---------------------------------------------------------
-# 4. PROFICIENCY ANALYSIS
+# 4. LEARNING OUTCOMES (Performance)
 # ---------------------------------------------------------
-st.subheader("📊 Proficiency vs. Performance")
-st.caption("Are 'Advanced' students actually solving problems faster?")
+st.header("🧠 Learning Performance")
 
-if 'student_proficiency' in df.columns:
-    # Clean up missing data
-    df['student_proficiency'] = df['student_proficiency'].fillna('Unknown')
-
+if not df_outcomes.empty:
     col_a, col_b = st.columns(2)
 
     with col_a:
-        # Success Rate by Proficiency
-        prof_success = df.groupby('student_proficiency')['is_correct'].mean().reset_index()
-        prof_success['is_correct'] = prof_success['is_correct'] * 100
+        # Success Rate
+        success_count = df_outcomes[df_outcomes['is_correct'] == True].shape[0]
+        total_attempts = len(df_outcomes)
+        rate = (success_count / total_attempts) * 100 if total_attempts > 0 else 0
 
-        fig_prof = px.bar(
-            prof_success,
-            x='student_proficiency',
-            y='is_correct',
-            title="Success Rate by Proficiency Level",
-            labels={'is_correct': 'Success Rate (%)', 'student_proficiency': 'Proficiency'},
-            color='student_proficiency',
-            range_y=[0, 100]
-        )
-        st.plotly_chart(fig_prof, use_container_width=True)
+        st.metric("Global Success Rate", f"{rate:.1f}%")
+
+        # Success by Persona
+        st.caption("Success Rate by AI Persona")
+        persona_perf = df_outcomes.groupby('persona')['is_correct'].mean().reset_index()
+        persona_perf['is_correct'] = persona_perf['is_correct'] * 100
+        fig_p = px.bar(persona_perf, x='persona', y='is_correct', range_y=[0, 100])
+        st.plotly_chart(fig_p, use_container_width=True)
 
     with col_b:
-        # Time to Solve by Proficiency
-        # Filter only correct answers to see how long it took them to get there
-        success_df = df[df['is_correct'] == True]
-        if not success_df.empty:
-            prof_time = success_df.groupby('student_proficiency')['seconds_taken'].mean().reset_index()
+        # Struggle Metric (Avg Attempts)
+        success_only = df_outcomes[df_outcomes['is_correct'] == True]
+        if not success_only.empty:
+            avg_tries = success_only['attempt_number'].mean()
+            st.metric("Avg Tries to Solution", f"{avg_tries:.1f}")
 
-            fig_time = px.bar(
-                prof_time,
-                x='student_proficiency',
-                y='seconds_taken',
-                title="Avg Time to Solve (Seconds)",
-                labels={'seconds_taken': 'Seconds', 'student_proficiency': 'Proficiency'},
-                color='seconds_taken',
-                color_continuous_scale='Bluered'
-            )
-            st.plotly_chart(fig_time, use_container_width=True)
+            st.caption("Avg Time to Solve (Seconds)")
+            time_perf = success_only.groupby('persona')['seconds_taken'].mean().reset_index()
+            fig_t = px.bar(time_perf, x='persona', y='seconds_taken')
+            st.plotly_chart(fig_t, use_container_width=True)
 else:
-    st.info("Proficiency data will appear here once students select their level.")
-
-# ---------------------------------------------------------
-# 5. PERSONA EFFECTIVENESS
-# ---------------------------------------------------------
-st.subheader("🤖 Persona Leaderboard")
-st.caption("Which AI tutor is driving the most successes?")
-
-if 'persona' in df.columns:
-    persona_stats = df[df['is_correct'] == True]['persona'].value_counts().reset_index()
-    persona_stats.columns = ['Persona', 'Solved Problems']
-
-    fig_persona = px.pie(
-        persona_stats,
-        values='Solved Problems',
-        names='Persona',
-        hole=0.4
-    )
-    st.plotly_chart(fig_persona, use_container_width=True)
-
-# ---------------------------------------------------------
-# 6. RAW DATA FEED
-# ---------------------------------------------------------
-with st.expander("📝 View Raw Live Data"):
-    st.dataframe(
-        df.sort_values('timestamp', ascending=False),
-        use_container_width=True
-    )
+    st.info("No learning outcomes recorded yet.")

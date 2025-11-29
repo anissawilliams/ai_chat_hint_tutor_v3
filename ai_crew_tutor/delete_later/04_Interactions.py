@@ -1,11 +1,11 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from utils.storage import get_db
+from utils.storage import load_interactions
 
 st.title("💬 Lesson Interactions")
 
-db = get_db()
+db = load_interactions()
 df_interactions = pd.DataFrame([doc.to_dict() for doc in db.collection("interactions").stream()])
 
 if not df_interactions.empty:

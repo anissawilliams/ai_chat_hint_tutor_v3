@@ -20,8 +20,12 @@ if not df_sessions.empty:
         'start_time': 'min'
     }).reset_index()
 
+    # Sort by start_time safely
+    grouped = grouped.sort_values('start_time', ascending=False)
+
     # Show simplified table
-    st.dataframe(grouped[['session_id','user_id','status','platform']].sort_values('start_time', ascending=False))
+    st.dataframe(grouped[['session_id', 'user_id', 'status', 'platform']])
+
 
     # Insights
     st.subheader("Sessions by Status")

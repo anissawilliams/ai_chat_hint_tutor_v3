@@ -3,43 +3,56 @@ import pandas as pd
 import plotly.express as px
 from utils.storage import get_db
 
-st.title("💬 Lesson Interactions")
+st.title("🖱️ Clicks & UI Engagement")
 
 db = get_db()
-df_interactions = pd.DataFrame([doc.to_dict() for doc in db.collection("interactions").stream()])
+df_clicks = pd.DataFrame([doc.to_dict() for doc in db.collection("clicks").stream()])
 
-if not df_interactions.empty:
-    df_interactions['timestamp'] = pd.to_datetime(df_interactions['timestamp'])
+if not df_clicks.empty:
+    # --- Normalize column names ---
+    rename_map = {
+        'timeStamp': 'timestamp',
+        'elementName': 'element_name',
+        'elementType': 'element_type',
+        'userId': 'user_id'
+    }
+    df_clicks.rename(columns=rename_map, inplace=True)
 
-    # Filters
-    min_date, max_date = df_interactions['timestamp'].min(), df_interactions['timestamp'].max()
-    start_date, end_date = st.date_input("Select Date Range", [min_date, max_date])
-    df_interactions = df_interactions[(df_interactions['timestamp'].dt.date >= start_date) &
-                                      (df_interactions['timestamp'].dt.date <= end_date)]
+    # --- Ensure timestamp is parsed if present ---
+    if 'timestamp' in df_clicks.columns:
+        df_clicks['timestamp'] = pd.to_datetime(df_clicks['timestamp'], errors='coerce')
+        df_clicks = df_clicks.sort_values('timestamp')
 
-    persona_options = df_interactions['persona'].dropna().unique().tolist()
-    selected_persona = st.multiselect("Filter by Persona", persona_options, default=persona_options)
-    df_interactions = df_interactions[df_interactions['persona'].isin(selected_persona)]
+    # --- Only show available columns ---
+    cols_to_show = [c for c in ['timestamp','element_name','element_type','user_id','session_id'] if c in df_clicks.columns]
+    st.dataframe(df_clicks[cols_to_show])
 
-    # Show filtered table
-    st.dataframe(df_interactions[['timestamp','session_id','persona','question','response_length']].sort_values('timestamp', ascending=False))
+    # --- Insights ---
+    st.subheader("Clicks per Element")
+    if 'element_name' in df_clicks.columns:
+        element_counts = df_clicks['element_name'].value_counts().reset_index()
+        element_counts.columns = ['Element','Clicks']
+        fig_elem = px.bar(element_counts, x='Element', y='Clicks', title="Most Clicked Elements")
+        st.plotly_chart(fig_elem, use_container_width=True)
 
-    # Insights
-    st.subheader("Interactions per Persona")
-    persona_counts = df_interactions['persona'].value_counts().reset_index()
-    persona_counts.columns = ['Persona','Interactions']
-    fig_persona = px.bar(persona_counts, x='Persona', y='Interactions', title="Interactions by Persona")
-    st.plotly_chart(fig_persona, use_container_width=True)
+    st.subheader("Clicks per Element Type")
+    if 'element_type' in df_clicks.columns:
+        type_counts = df_clicks['element_type'].value_counts().reset_index()
+        type_counts.columns = ['Type','Clicks']
+        fig_type = px.pie(type_counts, values='Clicks', names='Type', hole=0.4, title="Clicks by Element Type")
+        st.plotly_chart(fig_type, use_container_width=True)
 
-    st.subheader("Response Length Trends")
-    length_trend = df_interactions.groupby(df_interactions['timestamp'].dt.date)['response_length'].mean().reset_index()
-    fig_len = px.line(length_trend, x='timestamp', y='response_length', title="Avg Response Length per Day")
-    st.plotly_chart(fig_len, use_container_width=True)
+    st.subheader("Clicks Over Time")
+    if 'timestamp' in df_clicks.columns:
+        clicks_trend = df_clicks.groupby(df_clicks['timestamp'].dt.date).size().reset_index(name='Clicks')
+        fig_trend = px.line(clicks_trend, x='timestamp', y='Clicks', title="Clicks per Day")
+        st.plotly_chart(fig_trend, use_container_width=True)
 
-    st.subheader("Session Activity")
-    session_counts = df_interactions['session_id'].value_counts().reset_index()
-    session_counts.columns = ['Session ID','Interactions']
-    fig_sess = px.bar(session_counts.head(20), x='Session ID', y='Interactions', title="Top 20 Sessions by Interaction Count")
-    st.plotly_chart(fig_sess, use_container_width=True)
+    st.subheader("Top Users by Clicks")
+    if 'user_id' in df_clicks.columns:
+        user_counts = df_clicks['user_id'].value_counts().reset_index()
+        user_counts.columns = ['User ID','Clicks']
+        fig_users = px.bar(user_counts.head(20), x='User ID', y='Clicks', title="Top 20 Users by Clicks")
+        st.plotly_chart(fig_users, use_container_width=True)
 else:
-    st.info("No interactions recorded yet.")
+    st.info("No clicks recorded yet.")

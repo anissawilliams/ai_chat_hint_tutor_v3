@@ -18,3 +18,5 @@ huggingface
 plotly
 streamlit-modal
 firebase-admin
+wordcloud
+matplotlib

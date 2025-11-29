@@ -9,14 +9,23 @@ db = get_db()
 df_clicks = pd.DataFrame([doc.to_dict() for doc in db.collection("clicks").stream()])
 
 if not df_clicks.empty:
-    # --- Normalize column names ---
-    rename_map = {
+    # Normalize field names if Firestore uses camelCase
+    df_clicks.rename(columns={
         'timeStamp': 'timestamp',
         'elementName': 'element_name',
         'elementType': 'element_type',
         'userId': 'user_id'
-    }
-    df_clicks.rename(columns=rename_map, inplace=True)
+    }, inplace=True)
+
+    # Parse timestamp if present
+    if 'timestamp' in df_clicks.columns:
+        df_clicks['timestamp'] = pd.to_datetime(df_clicks['timestamp'], errors='coerce')
+        df_clicks = df_clicks.sort_values('timestamp')
+
+    # Only select columns that exist
+    cols_to_show = [c for c in ['timestamp','element_name','element_type','user_id','session_id'] if c in df_clicks.columns]
+
+    st.dataframe(df_clicks[cols_to_show])
 
     # --- Ensure timestamp is parsed if present ---
     if 'timestamp' in df_clicks.columns:

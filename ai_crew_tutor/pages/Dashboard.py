@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from utils.storage import get_db
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
 
 # ---------------------------------------------------------
 # 1. SETUP & AUTH
@@ -47,6 +49,16 @@ with tab_users:
     st.header("🔥 Engagement & Retention")
 
     if not df_users.empty:
+        # Persona filter (if personas exist in users)
+        persona_options = df_users['persona'].dropna().unique().tolist() if 'persona' in df_users.columns else []
+        if persona_options:
+            selected_persona = st.selectbox("Filter by Persona", ["All"] + persona_options)
+            if selected_persona != "All":
+                df_users = df_users[df_users['persona'] == selected_persona]
+
+        # Show filtered table
+        st.dataframe(df_users)
+
         col1, col2, col3, col4 = st.columns(4)
 
         with col1:
@@ -86,6 +98,20 @@ with tab_outcomes:
     st.header("🧠 Learning Performance")
 
     if not df_outcomes.empty:
+        # Date range filter
+        min_date, max_date = df_outcomes['timestamp'].min(), df_outcomes['timestamp'].max()
+        start_date, end_date = st.date_input("Select Date Range", [min_date, max_date])
+        df_outcomes = df_outcomes[(df_outcomes['timestamp'].dt.date >= start_date) &
+                                  (df_outcomes['timestamp'].dt.date <= end_date)]
+
+        # Persona filter
+        persona_options = df_outcomes['persona'].dropna().unique().tolist()
+        selected_persona = st.multiselect("Filter by Persona", persona_options, default=persona_options)
+        df_outcomes = df_outcomes[df_outcomes['persona'].isin(selected_persona)]
+
+        # Show filtered table
+        st.dataframe(df_outcomes)
+
         col_a, col_b = st.columns(2)
 
         with col_a:
@@ -119,6 +145,17 @@ with tab_feedback:
     st.header("📝 AI Training Feedback")
 
     if not df_feedback.empty:
+        # Date range filter
+        min_date, max_date = df_feedback['timestamp'].min(), df_feedback['timestamp'].max()
+        start_date, end_date = st.date_input("Select Feedback Date Range", [min_date, max_date])
+        df_feedback = df_feedback[(df_feedback['timestamp'].dt.date >= start_date) &
+                                  (df_feedback['timestamp'].dt.date <= end_date)]
+
+        # Persona filter
+        persona_options = df_feedback['persona'].dropna().unique().tolist()
+        selected_persona = st.multiselect("Filter by Persona", persona_options, default=persona_options)
+        df_feedback = df_feedback[df_feedback['persona'].isin(selected_persona)]
+
         st.subheader("Recent Feedback Records")
         st.dataframe(df_feedback[['timestamp', 'persona', 'bad_response', 'critique']].sort_values('timestamp', ascending=False))
 
@@ -132,5 +169,16 @@ with tab_feedback:
         length_trend = df_feedback.groupby(df_feedback['timestamp'].dt.date)['bad_length'].mean().reset_index()
         fig_l = px.line(length_trend, x='timestamp', y='bad_length', title="Avg Bad Response Length per Day")
         st.plotly_chart(fig_l, use_container_width=True)
+
+        st.subheader("Critique Themes Word Cloud")
+        text = " ".join(df_feedback['critique'].dropna().tolist())
+        if text.strip():
+            wordcloud = WordCloud(width=800, height=400, background_color="white", colormap="viridis").generate(text)
+            fig_wc, ax = plt.subplots(figsize=(10, 5))
+            ax.imshow(wordcloud, interpolation="bilinear")
+            ax.axis("off")
+            st.pyplot(fig_wc)
+        else:
+            st.info("No critiques available for word cloud.")
     else:
         st.info("No training feedback recorded yet.")
